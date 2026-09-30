@@ -1,0 +1,19 @@
+package br.com.damiq.desktop.inicializacao;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+/** Ponto de entrada do Desktop DAMIQ: sobe o Spring Context com a montagem dos módulos. */
+public final class DamiqDesktop {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DamiqDesktop.class);
+
+    private DamiqDesktop() {}
+
+    public static void main(String[] args) {
+        try (var contexto = new AnnotationConfigApplicationContext(ConfiguracaoAplicacao.class)) {
+            LOG.info("DAMIQ Desktop iniciado ({} beans)", contexto.getBeanDefinitionCount());
+        }
+    }
+}
