@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+build/
+out/
+bin/
+
+.idea/
+*.iml
+.vscode/
+
+# ambiente Python local do motor de cálculo
+.motor/
+
+*.db
+*.log
