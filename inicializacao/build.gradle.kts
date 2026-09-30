@@ -17,3 +17,8 @@ dependencies {
 application {
     mainClass = "br.com.damiq.desktop.inicializacao.DamiqDesktop"
 }
+
+tasks.named<JavaExec>("run") {
+    // o motor é procurado em .motor, na raiz do repositório
+    workingDir = rootDir
+}

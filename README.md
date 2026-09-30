@@ -10,6 +10,17 @@ no repositório do motor.
 
 - JDK 21 (LTS)
 - Não é preciso instalar o Gradle: use o wrapper (`gradlew`) versionado no repositório.
+- Python 3.13 com o motor de cálculo, num ambiente `.motor` na raiz do repositório (até o empacotamento do
+  motor, [issue #14](https://github.com/LDTLuis/modulo-calculo-api/issues/14)):
+
+  ```bash
+  py -3.13 -m venv .motor
+  .motor/Scripts/python -m pip install https://github.com/LDTLuis/modulo-calculo-api/releases/download/v1.0.1/damiq_calc-1.0.1-py3-none-any.whl
+  ```
+
+  No Linux, use `python3.13` e `.motor/bin/python`. Para usar outro Python, passe
+  `-Ddamiq.motor.python=<caminho>` ao aplicativo e defina `DAMIQ_MOTOR_PYTHON` para os testes.
+  Sem o motor, os testes de integração são pulados (no CI, com `DAMIQ_MOTOR_OBRIGATORIO=true`, falham).
 
 ## Comandos
 
