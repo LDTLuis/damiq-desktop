@@ -11,11 +11,13 @@ dependencies {
     implementation(libs.jackson.databind)
     implementation(libs.sqlite.jdbc)
     implementation(libs.flyway.core)
+    implementation(libs.poi.ooxml)
     implementation(libs.slf4j.api)
 
     testImplementation(libs.mockito.core)
     testImplementation(libs.mockito.junit.jupiter)
     testRuntimeOnly(libs.logback.classic)
+    testRuntimeOnly(libs.log4j.to.slf4j)
 }
 
 tasks.test {

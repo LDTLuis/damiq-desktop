@@ -51,6 +51,25 @@ O esquema é criado e atualizado pelo Flyway ao iniciar, a partir de
 Até a Central existir, a configuração de cada barragem é lida de `<dados>/configuracoes/<id da barragem>.json`,
 no formato da seção `configuracao` do contrato do motor, e só passa a valer depois de validada pelo motor.
 
+## Importação de leituras (CSV/XLSX)
+
+Arquivos da equipe de campo (RF-03): CSV (`.csv`, `.txt`) ou planilha Excel (`.xlsx`, `.xls`, primeira aba),
+com uma linha de títulos e uma leitura por linha.
+
+| Coluna | Títulos aceitos | Exemplo |
+|---|---|---|
+| instrumento | instrumento, sensor, código, ponto | `PZ-01` |
+| tipo | tipo, grandeza | `Pressão`, `nivel`, `VAZÃO` |
+| data e hora | data_hora, data/hora, timestamp, momento — ou **data** e **hora** separadas | `29/09/2026 08:00`, `2026-09-29T08:00:00-03:00` |
+| valor | valor, leitura, medição | `1,4` ou `1.4` |
+| unidade | unidade, unid., un | `bar`, `kPa`, `m³/s` |
+
+- Os títulos não diferenciam maiúsculas, acentos e pontuação; colunas extras (ex.: observação) são ignoradas.
+- CSV: separador `;`, `,` ou tabulação; UTF-8 ou Windows-1252 (o padrão do Excel em português).
+- Datas no formato brasileiro são convertidas para ISO-8601; sem fuso, vale o `fuso_padrao` da configuração.
+- Linhas em branco são ignoradas. Uma linha com problema não impede a importação: ela volta como rejeição,
+  com o número da linha e o motivo.
+
 ## Arquitetura
 
 As regras são verificadas pela tarefa `verificarArquitetura`, que roda no `check`/`build`.
