@@ -4,12 +4,15 @@ import br.com.damiq.desktop.aplicacao.barragem.RepositorioBarragens;
 import br.com.damiq.desktop.aplicacao.configuracao.AtualizarConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.FonteConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.RepositorioConfiguracoes;
+import br.com.damiq.desktop.aplicacao.importacao.ImportarMedicoes;
+import br.com.damiq.desktop.aplicacao.importacao.LeitorArquivoLeituras;
 import br.com.damiq.desktop.aplicacao.medicao.ProcessarMedicoes;
 import br.com.damiq.desktop.aplicacao.medicao.RepositorioMedicoes;
 import br.com.damiq.desktop.aplicacao.medicao.RepositorioProcessamentos;
 import br.com.damiq.desktop.aplicacao.motor.MotorCalculo;
 import br.com.damiq.desktop.aplicacao.motor.VerificarCompatibilidadeMotor;
 import br.com.damiq.desktop.infraestrutura.configuracao.FonteConfiguracaoArquivo;
+import br.com.damiq.desktop.infraestrutura.importacao.LeitorArquivoLeiturasPadrao;
 import br.com.damiq.desktop.infraestrutura.motor.ConfiguracaoMotor;
 import br.com.damiq.desktop.infraestrutura.motor.MotorCalculoProcessBuilder;
 import br.com.damiq.desktop.infraestrutura.persistencia.BancoDados;
@@ -131,6 +134,16 @@ public class ConfiguracaoAplicacao {
                 motorCalculo,
                 relogio,
                 ambiente.getProperty("damiq.motor.historico-por-instrumento", Integer.class, 48));
+    }
+
+    @Bean
+    LeitorArquivoLeituras leitorArquivoLeituras() {
+        return new LeitorArquivoLeiturasPadrao();
+    }
+
+    @Bean
+    ImportarMedicoes importarMedicoes(LeitorArquivoLeituras leitorArquivoLeituras, ProcessarMedicoes processarMedicoes) {
+        return new ImportarMedicoes(leitorArquivoLeituras, processarMedicoes);
     }
 
     private static Path diretorioDados(Environment ambiente) {

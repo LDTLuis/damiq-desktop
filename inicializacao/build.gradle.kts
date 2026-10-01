@@ -12,6 +12,7 @@ dependencies {
     implementation(libs.spring.context)
     implementation(libs.slf4j.api)
     runtimeOnly(libs.logback.classic)
+    runtimeOnly(libs.log4j.to.slf4j)
 }
 
 application {
