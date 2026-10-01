@@ -7,8 +7,18 @@ import br.com.damiq.desktop.aplicacao.barragem.SincronizarBarragens;
 import br.com.damiq.desktop.infraestrutura.barragem.FonteCadastroBarragensArquivo;
 import br.com.damiq.desktop.aplicacao.barragem.RepositorioBarragens;
 import br.com.damiq.desktop.aplicacao.manutencao.LimparDadosTeste;
-import br.com.damiq.desktop.aplicacao.usuario.UsuarioCorrente;
-import br.com.damiq.desktop.dominio.usuario.UsuarioId;
+import br.com.damiq.desktop.aplicacao.usuario.CodificadorSenha;
+import br.com.damiq.desktop.aplicacao.usuario.ControleAcesso;
+import br.com.damiq.desktop.aplicacao.usuario.DesbloquearUsuario;
+import br.com.damiq.desktop.aplicacao.usuario.Entrar;
+import br.com.damiq.desktop.aplicacao.usuario.FonteCadastroUsuarios;
+import br.com.damiq.desktop.aplicacao.usuario.RepositorioUsuarios;
+import br.com.damiq.desktop.aplicacao.usuario.Sessao;
+import br.com.damiq.desktop.aplicacao.usuario.SincronizarUsuarios;
+import br.com.damiq.desktop.aplicacao.usuario.TrocarSenha;
+import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioUsuariosJdbc;
+import br.com.damiq.desktop.infraestrutura.usuario.CodificadorSenhaBcrypt;
+import br.com.damiq.desktop.infraestrutura.usuario.FonteCadastroUsuariosArquivo;
 import br.com.damiq.desktop.infraestrutura.persistencia.Autoria;
 import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioDadosTesteJdbc;
 import br.com.damiq.desktop.aplicacao.configuracao.AtualizarConfiguracao;
@@ -60,6 +70,10 @@ import org.springframework.core.env.Environment;
  *   <li>{@code damiq.banco.arquivo}: banco SQLite (padrão: {@code <dados>/damiq.db});
  *   <li>{@code damiq.cadastro.arquivo}: cadastro das barragens publicado pela Central, até a API existir
  *       (padrão: {@code <dados>/cadastro/barragens.json});
+ *   <li>{@code damiq.usuarios.arquivo}: usuários publicados pela Central, até a API existir (padrão:
+ *       {@code <dados>/cadastro/usuarios.json});
+ *   <li>{@code damiq.acesso.limite-tentativas}: tentativas de acesso malsucedidas seguidas que bloqueiam o
+ *       usuário (padrão: 5);
  *   <li>{@code damiq.configuracao.diretorio}: arquivos {@code <id da barragem>.json} com a configuração, até a
  *       Central existir (padrão: {@code <dados>/configuracoes});
  *   <li>{@code damiq.motor.historico-por-instrumento}: leituras anteriores enviadas ao motor por instrumento;
@@ -100,15 +114,67 @@ public class ConfiguracaoAplicacao {
         return BancoDados.abrir(arquivo != null ? Path.of(arquivo) : diretorioDados(ambiente).resolve("damiq.db"));
     }
 
-    /** Até a autenticação (RF-01), toda alteração é do usuário "sistema". */
+    /** Usuário conectado; é também quem assina as alterações ("sistema" quando ninguém está conectado). */
     @Bean
-    UsuarioCorrente usuarioCorrente() {
-        return () -> UsuarioId.SISTEMA;
+    Sessao sessao() {
+        return new Sessao();
     }
 
     @Bean
-    Autoria autoria(Clock relogio, UsuarioCorrente usuarioCorrente) {
-        return new Autoria(relogio, usuarioCorrente);
+    Autoria autoria(Clock relogio, Sessao sessao) {
+        return new Autoria(relogio, sessao);
+    }
+
+    @Bean
+    ControleAcesso controleAcesso(Sessao sessao) {
+        return new ControleAcesso(sessao);
+    }
+
+    @Bean
+    CodificadorSenha codificadorSenha() {
+        return new CodificadorSenhaBcrypt();
+    }
+
+    @Bean
+    RepositorioUsuarios repositorioUsuarios(DataSource bancoDados, Autoria autoria) {
+        return new RepositorioUsuariosJdbc(bancoDados, autoria);
+    }
+
+    @Bean
+    FonteCadastroUsuarios fonteCadastroUsuarios(Environment ambiente) {
+        var arquivo = ambiente.getProperty("damiq.usuarios.arquivo");
+        return new FonteCadastroUsuariosArquivo(
+                arquivo != null ? Path.of(arquivo) : diretorioDados(ambiente).resolve("cadastro").resolve("usuarios.json"));
+    }
+
+    @Bean
+    SincronizarUsuarios sincronizarUsuarios(
+            FonteCadastroUsuarios fonteCadastroUsuarios,
+            RepositorioUsuarios repositorioUsuarios,
+            RepositorioBarragens repositorioBarragens) {
+        return new SincronizarUsuarios(fonteCadastroUsuarios, repositorioUsuarios, repositorioBarragens);
+    }
+
+    @Bean
+    Entrar entrar(
+            RepositorioUsuarios repositorioUsuarios,
+            RepositorioBarragens repositorioBarragens,
+            CodificadorSenha codificadorSenha,
+            Sessao sessao,
+            Clock relogio,
+            Environment ambiente) {
+        return new Entrar(repositorioUsuarios, repositorioBarragens, codificadorSenha, sessao, relogio,
+                ambiente.getProperty("damiq.acesso.limite-tentativas", Integer.class, Entrar.LIMITE_TENTATIVAS));
+    }
+
+    @Bean
+    TrocarSenha trocarSenha(RepositorioUsuarios repositorioUsuarios, CodificadorSenha codificadorSenha, Sessao sessao) {
+        return new TrocarSenha(repositorioUsuarios, codificadorSenha, sessao);
+    }
+
+    @Bean
+    DesbloquearUsuario desbloquearUsuario(RepositorioUsuarios repositorioUsuarios, ControleAcesso controleAcesso) {
+        return new DesbloquearUsuario(repositorioUsuarios, controleAcesso);
     }
 
     @Bean

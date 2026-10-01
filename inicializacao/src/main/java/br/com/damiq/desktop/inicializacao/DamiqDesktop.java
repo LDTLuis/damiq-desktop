@@ -5,6 +5,8 @@ import br.com.damiq.desktop.aplicacao.barragem.SincronizarBarragens;
 import br.com.damiq.desktop.aplicacao.motor.FalhaMotorException;
 import br.com.damiq.desktop.aplicacao.motor.VerificarCompatibilidadeMotor;
 import br.com.damiq.desktop.aplicacao.notificacao.NotificarAlertas;
+import br.com.damiq.desktop.aplicacao.usuario.FalhaFonteUsuariosException;
+import br.com.damiq.desktop.aplicacao.usuario.SincronizarUsuarios;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -23,6 +25,12 @@ public final class DamiqDesktop {
                 contexto.getBean(SincronizarBarragens.class).executar();
             } catch (FalhaFonteCadastroException e) {
                 LOG.warn("Cadastro de barragens não sincronizado; usando a cópia local: {}", e.getMessage());
+            }
+            // depois das barragens: cada usuário pertence a uma
+            try {
+                contexto.getBean(SincronizarUsuarios.class).executar();
+            } catch (FalhaFonteUsuariosException e) {
+                LOG.warn("Cadastro de usuários não sincronizado; usando a cópia local: {}", e.getMessage());
             }
             try {
                 contexto.getBean(VerificarCompatibilidadeMotor.class).executar();
