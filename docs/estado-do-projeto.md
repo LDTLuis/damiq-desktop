@@ -125,6 +125,13 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
     coordenador do PAE → empreendedor; amarelo + entidade fiscalizadora; vermelho + Defesa Civil (que alerta a
     população). A ordem da lista é a ordem de acionamento dentro do nível. Falta de papel previsto vira
     **pendência** exibida, não recusa do cadastro. O nível vem da notificação (`nivelResposta`, do motor).
+12. **Dois bancos**: a Central tem um servidor com **PostgreSQL**, que guarda tudo de forma consolidada; cada
+    aparelho tem um **SQLite** local para trabalhar sem rede. O que o Desktop gera (leituras, rejeições,
+    lacunas, alertas, notificações, reconhecimentos) **sincroniza com o servidor** quando há conexão. Ainda não
+    implementado; ver §7.
+13. **A barragem é o topo da cadeia, inclusive para o usuário**: cada usuário pertence a uma barragem e só vê e
+    altera os dados dela. A barragem vem do usuário conectado, **nunca de uma escolha na tela** (não há tela de
+    seleção de barragem). Os casos de uso continuam recebendo `BarragemId`; quem o fornece é a sessão (RF-01).
 
 ## 5. Como trabalhamos
 
@@ -147,7 +154,7 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 
 | Requisito | Situação |
 |---|---|
-| RF-01 Autenticação e perfis | **Não iniciado.** Base pronta: tabela `usuario`, porta `UsuarioCorrente` (hoje sempre "sistema"). Perfis por barragem |
+| RF-01 Autenticação e perfis | **Não iniciado.** Base pronta: tabela `usuario`, porta `UsuarioCorrente` (hoje sempre "sistema"). Cada usuário pertence a uma barragem (decisão 13) |
 | RF-02 Barragens | **Cópia do cadastro da Central** pronta (#10), com contatos do PAE (#12). Faltam estruturas, ZAS, instrumentos detalhados |
 | RF-03 Medições | Processamento (#6) e importação CSV/XLSX (#7) prontos. Falta digitação (tela) e exclusão de medição |
 | RF-04 Cálculos | `processar_lote` integrado. Faltam `listar_calculos`/`calcular` (telas de cálculo) |
@@ -167,6 +174,10 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 - **Formulário oficial da SEMAD (IN 01/2020) e do SNISB**: para completar o catálogo e definir obrigatórios.
 - **API da Central**: hoje configuração e cadastro vêm de arquivos locais (`FonteConfiguracaoArquivo`,
   `FonteCadastroBarragensArquivo`); trocar por clientes REST quando existir.
+- **Sincronização com o servidor da Central (PostgreSQL)**: fila de envio local; identificador global (UUID)
+  nas tabelas sincronizadas, porque os ids INTEGER de cada aparelho colidem no servidor (migração nova);
+  reenvio seguro pela unicidade de `medicao` (barragem + instrumento + momento); **em aberto** a regra de
+  conflito quando dois aparelhos alteram a mesma notificação.
 - **Banco criptografado**: o documento de requisitos fala em "Local Encrypted DB"; se exigido, trocar o driver
   por SQLCipher (`sqlite-jdbc-crypt`) sem mudar o esquema. Contatos (LGPD) reforçam a questão.
 - **JavaFX no mesmo repositório (`ui/`)**: aguardando o Pedro.
@@ -184,11 +195,13 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 
 ## 8. Próximos passos sugeridos
 
-1. **Consultas para o dashboard** (RF-05): séries por instrumento e período, situação atual por barragem.
+1. **Consultas para o dashboard** (RF-05): séries por instrumento e período, situação atual da barragem.
 2. **`listar_calculos` / `calcular`** (RF-04) com registro dos cálculos por barragem.
 3. **Registro da emergência** (RF-06 + RF-08): declaração de início e encerramento (obrigatória nos níveis
    amarelo e vermelho), mensagem de notificação (PAE §11, p. 115) e registro de quem foi acionado, quando e se
    confirmou o recebimento. Usa `ConsultarAcionamento`.
 4. **Tabela de auditoria** (RF-12).
-5. **Autenticação e perfis por barragem** (RF-01), substituindo o usuário "sistema".
-6. **Relatórios PDF** (RF-07) e **exportação** (RF-10).
+5. **Autenticação e perfis** (RF-01), substituindo o usuário "sistema": usuário vinculado à sua barragem, que
+   passa a ser o contexto de todas as telas (decisão 13).
+6. **Sincronização com o servidor da Central** (decisão 12), quando a API existir.
+7. **Relatórios PDF** (RF-07) e **exportação** (RF-10).
