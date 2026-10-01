@@ -4,6 +4,9 @@ import br.com.damiq.desktop.aplicacao.barragem.RepositorioBarragens;
 import br.com.damiq.desktop.aplicacao.configuracao.AtualizarConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.FonteConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.RepositorioConfiguracoes;
+import br.com.damiq.desktop.aplicacao.medicao.ProcessarMedicoes;
+import br.com.damiq.desktop.aplicacao.medicao.RepositorioMedicoes;
+import br.com.damiq.desktop.aplicacao.medicao.RepositorioProcessamentos;
 import br.com.damiq.desktop.aplicacao.motor.MotorCalculo;
 import br.com.damiq.desktop.aplicacao.motor.VerificarCompatibilidadeMotor;
 import br.com.damiq.desktop.infraestrutura.configuracao.FonteConfiguracaoArquivo;
@@ -12,6 +15,8 @@ import br.com.damiq.desktop.infraestrutura.motor.MotorCalculoProcessBuilder;
 import br.com.damiq.desktop.infraestrutura.persistencia.BancoDados;
 import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioBarragensJdbc;
 import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioConfiguracoesJdbc;
+import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioMedicoesJdbc;
+import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioProcessamentosJdbc;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
@@ -33,7 +38,10 @@ import org.springframework.core.env.Environment;
  *       {@code ~/.local/share/damiq} no Linux);
  *   <li>{@code damiq.banco.arquivo}: banco SQLite (padrão: {@code <dados>/damiq.db});
  *   <li>{@code damiq.configuracao.diretorio}: arquivos {@code <id da barragem>.json} com a configuração, até a
- *       Central existir (padrão: {@code <dados>/configuracoes}).
+ *       Central existir (padrão: {@code <dados>/configuracoes});
+ *   <li>{@code damiq.motor.historico-por-instrumento}: leituras anteriores enviadas ao motor por instrumento;
+ *       precisa cobrir {@code anomalia.janela_leituras} e {@code sensor_travado.leituras_consecutivas} da
+ *       configuração (padrão: 48).
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
@@ -94,6 +102,35 @@ public class ConfiguracaoAplicacao {
             Clock relogio) {
         return new AtualizarConfiguracao(
                 repositorioBarragens, repositorioConfiguracoes, fonteConfiguracao, motorCalculo, relogio);
+    }
+
+    @Bean
+    RepositorioMedicoes repositorioMedicoes(DataSource bancoDados) {
+        return new RepositorioMedicoesJdbc(bancoDados);
+    }
+
+    @Bean
+    RepositorioProcessamentos repositorioProcessamentos(DataSource bancoDados) {
+        return new RepositorioProcessamentosJdbc(bancoDados);
+    }
+
+    @Bean
+    ProcessarMedicoes processarMedicoes(
+            RepositorioBarragens repositorioBarragens,
+            RepositorioConfiguracoes repositorioConfiguracoes,
+            RepositorioMedicoes repositorioMedicoes,
+            RepositorioProcessamentos repositorioProcessamentos,
+            MotorCalculo motorCalculo,
+            Clock relogio,
+            Environment ambiente) {
+        return new ProcessarMedicoes(
+                repositorioBarragens,
+                repositorioConfiguracoes,
+                repositorioMedicoes,
+                repositorioProcessamentos,
+                motorCalculo,
+                relogio,
+                ambiente.getProperty("damiq.motor.historico-por-instrumento", Integer.class, 48));
     }
 
     private static Path diretorioDados(Environment ambiente) {

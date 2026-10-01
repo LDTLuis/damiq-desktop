@@ -15,9 +15,9 @@ import java.util.List;
  * Lote usado nos testes de {@code processar_lote}. A resposta do motor 1.0.1 para ele está gravada em
  * {@code motor/processar-lote-resposta-1.0.1.json}.
  */
-final class LoteExemplo {
+public final class LoteExemplo {
 
-    static final String CONFIGURACAO = """
+    public static final String CONFIGURACAO = """
             {"versao": 21, "sensores": {"PZ-01": {"tipo": "pressao", "frequencia_esperada_s": 3600,
               "faixa": {"min": 0, "max": 500, "unidade": "kPa"},
               "limites_alerta": {"unidade": "kPa", "acima": {"aviso": 180, "alerta": 215.82, "critico": 260}}}}}
@@ -25,7 +25,7 @@ final class LoteExemplo {
 
     private LoteExemplo() {}
 
-    static LoteMedicoes lote() {
+    public static LoteMedicoes lote() {
         var pz01 = new CodigoInstrumento("PZ-01");
         return new LoteMedicoes(
                 new BarragemId("joao-leite"),

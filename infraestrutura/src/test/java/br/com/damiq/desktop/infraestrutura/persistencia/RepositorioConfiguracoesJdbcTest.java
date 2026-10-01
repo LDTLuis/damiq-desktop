@@ -121,10 +121,13 @@ class RepositorioConfiguracoesJdbcTest {
     @Test
     void reabrirOBancoNaoRepeteAsMigracoes() throws SQLException {
         ativar(JOAO_LEITE, "21");
+        var historico = "SELECT version, success FROM flyway_schema_history ORDER BY installed_rank";
+        var antes = linhas(historico);
 
         var reaberto = new RepositorioConfiguracoesJdbc(BancoDados.abrir(diretorio.resolve("damiq.db")));
 
         assertEquals("21", reaberto.vigente(JOAO_LEITE).orElseThrow().versao().valor());
-        assertEquals(List.of("1|1"), linhas("SELECT version, success FROM flyway_schema_history"));
+        assertEquals(antes, linhas(historico));
+        assertTrue(antes.stream().allMatch(linha -> linha.endsWith("|1")), antes.toString());
     }
 }
