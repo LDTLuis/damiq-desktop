@@ -39,6 +39,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -127,8 +128,30 @@ class ProcessarMedicoesTest {
         when(medicoes.registradas(any(), anyCollection())).thenReturn(Set.of());
         when(motor.processarLote(any())).thenReturn(resultado(V21));
         when(processamentos.registrar(any())).thenReturn(7L);
-        processar = new ProcessarMedicoes(barragens, configuracoes, medicoes, processamentos, motor,
+        processar = new ProcessarMedicoes(barragens, configuracoes, medicoes, processamentos, motor, eventos::add,
                 Clock.fixed(AGORA, ZoneOffset.UTC), 48);
+    }
+
+    private final List<Object> eventos = new ArrayList<>();
+
+    @Test
+    void publicaMedicoesProcessadasDepoisDeGravar() {
+        processar.executar(JOAO_LEITE, LEITURAS, OrigemLeituras.DIGITACAO, null);
+
+        assertEquals(List.of(new MedicoesProcessadas(JOAO_LEITE, 7L, 1)), eventos);
+    }
+
+    @Test
+    void falhaDeQuemOuveNaoDesfazOProcessamento() {
+        var comOuvinteComDefeito = new ProcessarMedicoes(barragens, configuracoes, medicoes, processamentos, motor,
+                evento -> {
+                    throw new IllegalStateException("ouvinte com defeito");
+                },
+                Clock.fixed(AGORA, ZoneOffset.UTC), 48);
+
+        var resultado = comOuvinteComDefeito.executar(JOAO_LEITE, LEITURAS, OrigemLeituras.DIGITACAO, null);
+
+        assertEquals(7L, resultado.processamento());
     }
 
     @Test
@@ -242,7 +265,7 @@ class ProcessarMedicoesTest {
     @Test
     void historicoPorInstrumentoDeveSerPositivo() {
         assertThrows(IllegalArgumentException.class, () -> new ProcessarMedicoes(barragens, configuracoes, medicoes,
-                processamentos, motor, Clock.systemUTC(), 0));
+                processamentos, motor, evento -> {}, Clock.systemUTC(), 0));
         verify(medicoes, never()).ultimas(any(), anyInt());
     }
 }

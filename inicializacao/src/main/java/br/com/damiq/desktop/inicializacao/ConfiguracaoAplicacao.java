@@ -4,12 +4,17 @@ import br.com.damiq.desktop.aplicacao.barragem.RepositorioBarragens;
 import br.com.damiq.desktop.aplicacao.configuracao.AtualizarConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.FonteConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.RepositorioConfiguracoes;
+import br.com.damiq.desktop.aplicacao.evento.PublicadorEventos;
 import br.com.damiq.desktop.aplicacao.importacao.ImportarMedicoes;
 import br.com.damiq.desktop.aplicacao.importacao.LeitorArquivoLeituras;
 import br.com.damiq.desktop.aplicacao.medicao.ProcessarMedicoes;
 import br.com.damiq.desktop.aplicacao.medicao.RepositorioMedicoes;
 import br.com.damiq.desktop.aplicacao.medicao.RepositorioProcessamentos;
 import br.com.damiq.desktop.aplicacao.motor.MotorCalculo;
+import br.com.damiq.desktop.aplicacao.notificacao.ConsultarNotificacoes;
+import br.com.damiq.desktop.aplicacao.notificacao.NotificarAlertas;
+import br.com.damiq.desktop.aplicacao.notificacao.ReconhecerNotificacao;
+import br.com.damiq.desktop.aplicacao.notificacao.RepositorioNotificacoes;
 import br.com.damiq.desktop.aplicacao.motor.VerificarCompatibilidadeMotor;
 import br.com.damiq.desktop.infraestrutura.configuracao.FonteConfiguracaoArquivo;
 import br.com.damiq.desktop.infraestrutura.importacao.LeitorArquivoLeiturasPadrao;
@@ -19,11 +24,13 @@ import br.com.damiq.desktop.infraestrutura.persistencia.BancoDados;
 import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioBarragensJdbc;
 import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioConfiguracoesJdbc;
 import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioMedicoesJdbc;
+import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioNotificacoesJdbc;
 import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioProcessamentosJdbc;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import javax.sql.DataSource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -53,6 +60,12 @@ public class ConfiguracaoAplicacao {
     @Bean
     Clock relogio() {
         return Clock.systemUTC();
+    }
+
+    /** Eventos da aplicação pelo Spring Events; a interface (JavaFX) os ouve com {@code @EventListener}. */
+    @Bean
+    PublicadorEventos publicadorEventos(ApplicationEventPublisher publicador) {
+        return publicador::publishEvent;
     }
 
     @Bean
@@ -124,6 +137,7 @@ public class ConfiguracaoAplicacao {
             RepositorioMedicoes repositorioMedicoes,
             RepositorioProcessamentos repositorioProcessamentos,
             MotorCalculo motorCalculo,
+            PublicadorEventos publicadorEventos,
             Clock relogio,
             Environment ambiente) {
         return new ProcessarMedicoes(
@@ -132,6 +146,7 @@ public class ConfiguracaoAplicacao {
                 repositorioMedicoes,
                 repositorioProcessamentos,
                 motorCalculo,
+                publicadorEventos,
                 relogio,
                 ambiente.getProperty("damiq.motor.historico-por-instrumento", Integer.class, 48));
     }
@@ -144,6 +159,33 @@ public class ConfiguracaoAplicacao {
     @Bean
     ImportarMedicoes importarMedicoes(LeitorArquivoLeituras leitorArquivoLeituras, ProcessarMedicoes processarMedicoes) {
         return new ImportarMedicoes(leitorArquivoLeituras, processarMedicoes);
+    }
+
+    @Bean
+    RepositorioNotificacoes repositorioNotificacoes(DataSource bancoDados) {
+        return new RepositorioNotificacoesJdbc(bancoDados);
+    }
+
+    @Bean
+    NotificarAlertas notificarAlertas(
+            RepositorioNotificacoes repositorioNotificacoes, PublicadorEventos publicadorEventos, Clock relogio) {
+        return new NotificarAlertas(repositorioNotificacoes, publicadorEventos, relogio);
+    }
+
+    @Bean
+    ConsultarNotificacoes consultarNotificacoes(RepositorioNotificacoes repositorioNotificacoes) {
+        return new ConsultarNotificacoes(repositorioNotificacoes);
+    }
+
+    @Bean
+    ReconhecerNotificacao reconhecerNotificacao(
+            RepositorioNotificacoes repositorioNotificacoes, PublicadorEventos publicadorEventos, Clock relogio) {
+        return new ReconhecerNotificacao(repositorioNotificacoes, publicadorEventos, relogio);
+    }
+
+    @Bean
+    OuvinteNotificacoes ouvinteNotificacoes(NotificarAlertas notificarAlertas) {
+        return new OuvinteNotificacoes(notificarAlertas);
     }
 
     private static Path diretorioDados(Environment ambiente) {

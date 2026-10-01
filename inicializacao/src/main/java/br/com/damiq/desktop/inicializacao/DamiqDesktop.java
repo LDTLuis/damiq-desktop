@@ -2,6 +2,7 @@ package br.com.damiq.desktop.inicializacao;
 
 import br.com.damiq.desktop.aplicacao.motor.FalhaMotorException;
 import br.com.damiq.desktop.aplicacao.motor.VerificarCompatibilidadeMotor;
+import br.com.damiq.desktop.aplicacao.notificacao.NotificarAlertas;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -20,6 +21,11 @@ public final class DamiqDesktop {
                 contexto.getBean(VerificarCompatibilidadeMotor.class).executar();
             } catch (FalhaMotorException e) {
                 LOG.error("Motor de cálculo indisponível: {}", e.getMessage());
+            }
+            // alertas gravados sem notificação (ex.: o app fechou logo depois de um processamento)
+            var recuperadas = contexto.getBean(NotificarAlertas.class).executarPendentes();
+            if (!recuperadas.isEmpty()) {
+                LOG.warn("{} notificações geradas para alertas pendentes", recuperadas.size());
             }
         }
     }

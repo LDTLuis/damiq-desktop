@@ -52,7 +52,7 @@ class ProcessarMedicoesIntegracaoTest {
         // relógio depois das leituras, para nenhuma ser recusada como futura
         var relogio = Clock.fixed(Instant.parse("2026-09-30T02:00:00Z"), ZoneOffset.UTC);
         processar = new ProcessarMedicoes(barragens, configuracoes, medicoes, new RepositorioProcessamentosJdbc(banco),
-                motor, relogio, 48);
+                motor, evento -> {}, relogio, 48);
     }
 
     @Test

@@ -4,6 +4,7 @@ import br.com.damiq.desktop.aplicacao.barragem.BarragemNaoCadastradaException;
 import br.com.damiq.desktop.aplicacao.barragem.RepositorioBarragens;
 import br.com.damiq.desktop.aplicacao.configuracao.ConfiguracaoAusenteException;
 import br.com.damiq.desktop.aplicacao.configuracao.RepositorioConfiguracoes;
+import br.com.damiq.desktop.aplicacao.evento.PublicadorEventos;
 import br.com.damiq.desktop.aplicacao.medicao.RegistroProcessamento.RejeicaoLeitura;
 import br.com.damiq.desktop.aplicacao.motor.FalhaMotorException;
 import br.com.damiq.desktop.aplicacao.motor.LoteMedicoes;
@@ -38,6 +39,7 @@ public final class ProcessarMedicoes {
     private final RepositorioMedicoes medicoes;
     private final RepositorioProcessamentos processamentos;
     private final MotorCalculo motor;
+    private final PublicadorEventos eventos;
     private final Clock relogio;
     private final int historicoPorInstrumento;
 
@@ -52,6 +54,7 @@ public final class ProcessarMedicoes {
             RepositorioMedicoes medicoes,
             RepositorioProcessamentos processamentos,
             MotorCalculo motor,
+            PublicadorEventos eventos,
             Clock relogio,
             int historicoPorInstrumento) {
         this.barragens = Validacao.obrigatorio(barragens, "repositório de barragens");
@@ -59,6 +62,7 @@ public final class ProcessarMedicoes {
         this.medicoes = Validacao.obrigatorio(medicoes, "repositório de medições");
         this.processamentos = Validacao.obrigatorio(processamentos, "repositório de processamentos");
         this.motor = Validacao.obrigatorio(motor, "motor de cálculo");
+        this.eventos = Validacao.obrigatorio(eventos, "publicador de eventos");
         this.relogio = Validacao.obrigatorio(relogio, "relógio");
         if (historicoPorInstrumento < 1) {
             throw new IllegalArgumentException("histórico por instrumento deve ser positivo: " + historicoPorInstrumento);
@@ -119,6 +123,12 @@ public final class ProcessarMedicoes {
                 alertas));
 
         registrarNoLog(barragem, id, lote, novas.size(), repetidas.size(), alertas);
+        try {
+            eventos.publicar(new MedicoesProcessadas(barragem, id, alertas.size()));
+        } catch (RuntimeException e) {
+            // o processamento já está gravado; alertas sem notificação são recuperados na próxima execução
+            LOG.error("Processamento {} gravado, mas o tratamento posterior falhou: {}", id, e.getMessage(), e);
+        }
         return new ResultadoProcessamento(id, lote, novas, repetidas, alertas);
     }
 

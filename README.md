@@ -70,6 +70,14 @@ com uma linha de títulos e uma leitura por linha.
 - Linhas em branco são ignoradas. Uma linha com problema não impede a importação: ela volta como rejeição,
   com o número da linha e o motivo.
 
+## Notificações de alerta (RF-06)
+
+Cada alerta gravado gera uma notificação no app. Enquanto ela não for reconhecida, novos episódios do mesmo
+problema (barragem, instrumento e tipo de alerta) entram nela como ocorrências e, se forem mais graves, a
+escalam. Depois do reconhecimento (quem, quando e observação, para auditoria), o próximo episódio abre uma
+notificação nova. Os eventos `NotificacaoEmitida` e `NotificacaoReconhecida` saem pelo Spring Events, para a
+interface exibir.
+
 ## Arquitetura
 
 As regras são verificadas pela tarefa `verificarArquitetura`, que roda no `check`/`build`.
