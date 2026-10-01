@@ -3,7 +3,9 @@
 Aplicativo Desktop do DAMIQ (monitoramento de barragens): registro e importação de medições, integração com o
 [motor de cálculo](https://github.com/LDTLuis/modulo-calculo-api), alertas, cadastros e relatórios.
 
-Decisões e escopo: [`docs/desktop/decisoes-back-desktop.md`](https://github.com/LDTLuis/modulo-calculo-api/blob/main/docs/desktop/decisoes-back-desktop.md)
+**Estado atual, decisões e próximos passos:** [`docs/estado-do-projeto.md`](docs/estado-do-projeto.md).
+
+Decisões e escopo iniciais: [`docs/desktop/decisoes-back-desktop.md`](https://github.com/LDTLuis/modulo-calculo-api/blob/main/docs/desktop/decisoes-back-desktop.md)
 no repositório do motor.
 
 ## Requisitos
