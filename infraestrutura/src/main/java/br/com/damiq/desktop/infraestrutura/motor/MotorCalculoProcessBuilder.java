@@ -2,12 +2,17 @@ package br.com.damiq.desktop.infraestrutura.motor;
 
 import br.com.damiq.desktop.aplicacao.motor.FalhaMotorException;
 import br.com.damiq.desktop.aplicacao.motor.InfoMotor;
+import br.com.damiq.desktop.aplicacao.motor.LoteMedicoes;
 import br.com.damiq.desktop.aplicacao.motor.MensagemMotor;
 import br.com.damiq.desktop.aplicacao.motor.MotorCalculo;
+import br.com.damiq.desktop.aplicacao.motor.RequisicaoRecusadaException;
+import br.com.damiq.desktop.aplicacao.motor.ResultadoLote;
 import br.com.damiq.desktop.aplicacao.motor.ValidacaoConfiguracao;
 import br.com.damiq.desktop.dominio.Validacao;
 import br.com.damiq.desktop.dominio.configuracao.Configuracao;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
@@ -15,7 +20,6 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Adapter do {@link MotorCalculo}: chama o motor Python como processo filho.
@@ -47,10 +51,7 @@ public final class MotorCalculoProcessBuilder implements MotorCalculo {
 
     @Override
     public InfoMotor info() {
-        var resposta = chamar(requisicao("info"));
-        if (!resposta.ok()) {
-            throw new FalhaMotorException("O motor recusou a operação info: " + mensagens(resposta.erros()));
-        }
+        var resposta = chamarExigindoSucesso(RequisicaoMotor.de("info"));
         if (resposta.motor() == null) {
             throw new FalhaMotorException("Resposta de info sem o campo 'motor'");
         }
@@ -67,23 +68,49 @@ public final class MotorCalculoProcessBuilder implements MotorCalculo {
                     "JSON_INVALIDO", "A configuração não é um JSON válido: " + e.getOriginalMessage(), "configuracao");
             return new ValidacaoConfiguracao(List.of(erro), List.of());
         }
-        var requisicao = requisicao("validar_configuracao");
-        requisicao.set("configuracao", conteudo);
-
-        var resposta = chamar(requisicao);
+        var resposta = chamar(new RequisicaoMotor(
+                VERSAO_CONTRATO, "validar_configuracao", null, conteudo, null, null, null));
         if (!resposta.ok() && resposta.erros().isEmpty()) {
             throw new FalhaMotorException("O motor recusou a configuração sem informar o motivo");
         }
-        return new ValidacaoConfiguracao(mensagens(resposta.erros()), mensagens(resposta.avisos()));
+        return new ValidacaoConfiguracao(
+                TraducaoContrato.mensagens(resposta.erros()), TraducaoContrato.mensagens(resposta.avisos()));
     }
 
-    private static ObjectNode requisicao(String operacao) {
-        return JSON.createObjectNode().put("versao_contrato", VERSAO_CONTRATO).put("operacao", operacao);
+    @Override
+    public ResultadoLote processarLote(LoteMedicoes lote) {
+        JsonNode configuracao;
+        try {
+            configuracao = JSON.readTree(lote.configuracao().conteudoJson());
+        } catch (JacksonException e) {
+            throw new FalhaMotorException("A configuração " + lote.configuracao().versao()
+                    + " gravada não é um JSON válido: " + e.getOriginalMessage(), e);
+        }
+        var requisicao = new RequisicaoMotor(
+                VERSAO_CONTRATO,
+                "processar_lote",
+                Map.of("id", lote.barragem().valor()),
+                configuracao,
+                new RequisicaoMotor.Opcoes(DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(lote.agora())),
+                lote.leituras().stream().map(TraducaoContrato::leitura).toList(),
+                lote.historico().stream().map(TraducaoContrato::leitura).toList());
+
+        return TraducaoContrato.resultadoLote(chamarExigindoSucesso(requisicao));
+    }
+
+    /** A resposta de uma operação que não pode ser recusada pelo motor (saída 1 vira exceção). */
+    private RespostaMotor chamarExigindoSucesso(RequisicaoMotor requisicao) {
+        var resposta = chamar(requisicao);
+        if (!resposta.ok()) {
+            throw new RequisicaoRecusadaException(
+                    requisicao.operacao(), TraducaoContrato.mensagens(resposta.erros()));
+        }
+        return resposta;
     }
 
     /** Executa a requisição e devolve a resposta de uma saída 0 ou 1; as demais viram {@link FalhaMotorException}. */
-    private RespostaMotor chamar(ObjectNode requisicao) {
-        var operacao = requisicao.get("operacao").asString();
+    private RespostaMotor chamar(RequisicaoMotor requisicao) {
+        var operacao = requisicao.operacao();
         var execucao = executor.executar(JSON.writeValueAsString(requisicao));
         var codigo = execucao.codigoSaida();
 
@@ -114,11 +141,5 @@ public final class MotorCalculoProcessBuilder implements MotorCalculo {
                     "Resposta inconsistente do motor: status " + resposta.status() + " com código de saída " + codigo);
         }
         return resposta;
-    }
-
-    private static List<MensagemMotor> mensagens(List<RespostaMotor.Mensagem> mensagens) {
-        return mensagens.stream()
-                .map(m -> new MensagemMotor(m.codigo(), m.mensagem(), m.campo()))
-                .toList();
     }
 }
