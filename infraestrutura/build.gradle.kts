@@ -9,6 +9,8 @@ dependencies {
 
     implementation(platform(libs.jackson.bom))
     implementation(libs.jackson.databind)
+    implementation(libs.sqlite.jdbc)
+    implementation(libs.flyway.core)
     implementation(libs.slf4j.api)
 
     testImplementation(libs.mockito.core)

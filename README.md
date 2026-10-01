@@ -41,6 +41,18 @@ No Windows (PowerShell/cmd), use `gradlew.bat` ou `.\gradlew`.
 | `infraestrutura` | Adapters: motor de cálculo, SQLite, Central | `aplicacao`, `dominio` |
 | `inicializacao` | Montagem do Spring Context e ponto de entrada | todos |
 
+## Dados locais
+
+O banco SQLite (`damiq.db`) e os arquivos de configuração ficam no diretório de dados do usuário:
+`%APPDATA%\DAMIQ` no Windows e `~/.local/share/damiq` no Linux (ou `-Ddamiq.dados.diretorio=<caminho>`).
+O esquema é criado e atualizado pelo Flyway ao iniciar, a partir de
+[`db/migracao`](infraestrutura/src/main/resources/db/migracao).
+
+Até a Central existir, a configuração de cada barragem é lida de `<dados>/configuracoes/<id da barragem>.json`,
+no formato da seção `configuracao` do contrato do motor, e só passa a valer depois de validada pelo motor.
+
+## Arquitetura
+
 As regras são verificadas pela tarefa `verificarArquitetura`, que roda no `check`/`build`.
 As versões das bibliotecas ficam em [`gradle/libs.versions.toml`](gradle/libs.versions.toml) e as convenções
 comuns (Java 21, UTF-8, JUnit) em [`build-logic`](build-logic/src/main/kotlin/damiq.java.gradle.kts).
