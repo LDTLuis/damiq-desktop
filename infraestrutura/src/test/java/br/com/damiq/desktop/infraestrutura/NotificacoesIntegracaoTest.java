@@ -1,5 +1,6 @@
 package br.com.damiq.desktop.infraestrutura;
 
+import br.com.damiq.desktop.infraestrutura.persistencia.AutoriaDeTeste;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -61,19 +62,19 @@ class NotificacoesIntegracaoTest {
     void montar() {
         motor = MotorInstalado.exigir();
         banco = BancoDados.abrir(diretorio.resolve("damiq.db"));
-        barragens = new RepositorioBarragensJdbc(banco, Clock.systemUTC());
+        barragens = new RepositorioBarragensJdbc(banco, AutoriaDeTeste.SISTEMA);
         barragens.salvar(new Barragem(JOAO_LEITE, "João Leite"));
-        configuracoes = new RepositorioConfiguracoesJdbc(banco);
+        configuracoes = new RepositorioConfiguracoesJdbc(banco, AutoriaDeTeste.SISTEMA);
         configuracoes.ativar(JOAO_LEITE, new Configuracao(new VersaoConfiguracao("21"), LoteExemplo.CONFIGURACAO),
                 OrigemConfiguracao.ARQUIVO, Instant.now());
 
-        repositorio = new RepositorioNotificacoesJdbc(banco);
+        repositorio = new RepositorioNotificacoesJdbc(banco, AutoriaDeTeste.SISTEMA);
         notificar = new NotificarAlertas(repositorio, evento -> {}, relogio);
         consultar = new ConsultarNotificacoes(repositorio);
         reconhecer = new ReconhecerNotificacao(repositorio, evento -> {}, relogio);
         // como o OuvinteNotificacoes faz no app
         processar = new ProcessarMedicoes(barragens, configuracoes, new RepositorioMedicoesJdbc(banco),
-                new RepositorioProcessamentosJdbc(banco), motor,
+                new RepositorioProcessamentosJdbc(banco, AutoriaDeTeste.SISTEMA), motor,
                 evento -> notificar.executar(((MedicoesProcessadas) evento).barragem()), relogio, 48);
     }
 
@@ -126,7 +127,7 @@ class NotificacoesIntegracaoTest {
     void alertasSemNotificacaoSaoRecuperados() {
         // como se o app fechasse entre gravar o processamento e gerar as notificações
         var semNotificar = new ProcessarMedicoes(barragens, configuracoes, new RepositorioMedicoesJdbc(banco),
-                new RepositorioProcessamentosJdbc(banco), motor, evento -> {}, relogio, 48);
+                new RepositorioProcessamentosJdbc(banco, AutoriaDeTeste.SISTEMA), motor, evento -> {}, relogio, 48);
         semNotificar.executar(JOAO_LEITE, List.of(pz01("08", "230")), OrigemLeituras.DIGITACAO, null);
         assertEquals(List.of(JOAO_LEITE), repositorio.barragensComAlertasPendentes());
 

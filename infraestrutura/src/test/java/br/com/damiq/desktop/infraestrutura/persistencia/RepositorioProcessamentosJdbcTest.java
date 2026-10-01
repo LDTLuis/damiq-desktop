@@ -57,10 +57,10 @@ class RepositorioProcessamentosJdbcTest {
     @BeforeEach
     void criarBanco() {
         banco = BancoDados.abrir(diretorio.resolve("damiq.db"));
-        new RepositorioBarragensJdbc(banco, Clock.systemUTC()).salvar(new Barragem(JOAO_LEITE, "João Leite"));
-        new RepositorioConfiguracoesJdbc(banco).ativar(JOAO_LEITE,
+        new RepositorioBarragensJdbc(banco, AutoriaDeTeste.SISTEMA).salvar(new Barragem(JOAO_LEITE, "João Leite"));
+        new RepositorioConfiguracoesJdbc(banco, AutoriaDeTeste.SISTEMA).ativar(JOAO_LEITE,
                 new Configuracao(V21, "{\"versao\": 21}"), OrigemConfiguracao.ARQUIVO, Instant.now());
-        processamentos = new RepositorioProcessamentosJdbc(banco);
+        processamentos = new RepositorioProcessamentosJdbc(banco, AutoriaDeTeste.SISTEMA);
         medicoes = new RepositorioMedicoesJdbc(banco);
     }
 

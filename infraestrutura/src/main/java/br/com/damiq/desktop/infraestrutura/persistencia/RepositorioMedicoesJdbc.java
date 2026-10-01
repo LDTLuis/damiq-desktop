@@ -34,7 +34,7 @@ public final class RepositorioMedicoesJdbc implements RepositorioMedicoes {
                     SELECT instrumento, tipo, momento, fuso, valor FROM (
                         SELECT instrumento, tipo, momento, fuso, valor,
                                ROW_NUMBER() OVER (PARTITION BY instrumento ORDER BY momento DESC) AS ordem
-                        FROM medicao WHERE barragem_id = ?)
+                        FROM medicao WHERE barragem_id = ? AND excluido_em IS NULL)
                     WHERE ordem <= ?
                     ORDER BY instrumento, momento
                     """)) {
@@ -66,7 +66,7 @@ public final class RepositorioMedicoesJdbc implements RepositorioMedicoes {
             var encontradas = new HashSet<ChaveMedicao>();
             try (var consulta = conexao.prepareStatement("""
                     SELECT momento FROM medicao
-                    WHERE barragem_id = ? AND instrumento = ? AND momento BETWEEN ? AND ?
+                    WHERE barragem_id = ? AND instrumento = ? AND momento BETWEEN ? AND ? AND excluido_em IS NULL
                     """)) {
                 for (var grupo : porInstrumento.entrySet()) {
                     var instantes = grupo.getValue().stream().map(ChaveMedicao::instante).toList();

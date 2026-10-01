@@ -27,20 +27,25 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
 
     private static final String COLUNAS_NOTIFICACAO = """
             id, barragem_id, instrumento, tipo_alerta, categoria, severidade, mensagem, leitura_suspeita,
-            nivel_resposta, ocorrencias, criada_em, atualizada_em, reconhecida_em, reconhecida_por, observacao
+            nivel_resposta, ocorrencias, criado_em, atualizado_em, reconhecida_em, reconhecida_por, observacao
             """;
 
     private final Jdbc jdbc;
+    private final Autoria autoria;
 
-    public RepositorioNotificacoesJdbc(DataSource fonte) {
+    public RepositorioNotificacoesJdbc(DataSource fonte, Autoria autoria) {
         this.jdbc = new Jdbc(Validacao.obrigatorio(fonte, "banco de dados"));
+        this.autoria = Validacao.obrigatorio(autoria, "autoria");
     }
 
     @Override
     public List<BarragemId> barragensComAlertasPendentes() {
         return jdbc.executar("listar barragens com alertas pendentes", conexao -> {
             try (var consulta = conexao.prepareStatement(
-                            "SELECT DISTINCT barragem_id FROM alerta WHERE notificacao_id IS NULL ORDER BY barragem_id");
+                            """
+                            SELECT DISTINCT barragem_id FROM alerta
+                            WHERE notificacao_id IS NULL AND excluido_em IS NULL ORDER BY barragem_id
+                            """);
                     var linhas = consulta.executeQuery()) {
                 var barragens = new ArrayList<BarragemId>();
                 while (linhas.next()) {
@@ -61,7 +66,7 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
                     FROM alerta a
                     JOIN processamento p ON p.id = a.processamento_id
                     JOIN configuracao c ON c.id = p.configuracao_id
-                    WHERE a.barragem_id = ? AND a.notificacao_id IS NULL
+                    WHERE a.barragem_id = ? AND a.notificacao_id IS NULL AND a.excluido_em IS NULL
                     ORDER BY a.id
                     """)) {
                 consulta.setString(1, barragem.valor());
@@ -79,7 +84,8 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
     @Override
     public List<Notificacao> abertas(BarragemId barragem) {
         return jdbc.executar("listar notificações abertas", conexao -> {
-            var sql = "SELECT " + COLUNAS_NOTIFICACAO + " FROM notificacao WHERE reconhecida_em IS NULL"
+            var sql = "SELECT " + COLUNAS_NOTIFICACAO
+                    + " FROM notificacao WHERE reconhecida_em IS NULL AND excluido_em IS NULL"
                     + (barragem == null ? "" : " AND barragem_id = ?") + " ORDER BY id";
             try (var consulta = conexao.prepareStatement(sql)) {
                 if (barragem != null) {
@@ -107,9 +113,9 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
             var gravadas = new ArrayList<Notificacao>();
             for (var gravacao : gravacoes) {
                 var id = gravacao.notificacao().id() == null
-                        ? inserir(conexao, gravacao.notificacao())
-                        : atualizar(conexao, gravacao.notificacao());
-                vincular(conexao, id, gravacao.alertas());
+                        ? inserir(conexao, gravacao.notificacao(), autoria.usuario())
+                        : atualizar(conexao, gravacao.notificacao(), autoria.usuario());
+                vincular(conexao, id, gravacao.alertas(), autoria);
                 gravadas.add(buscar(conexao, id).orElseThrow());
             }
             return gravadas;
@@ -120,23 +126,28 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
     public boolean reconhecer(long id, String por, String observacao, Instant em) {
         return jdbc.executar("reconhecer a notificação " + id, conexao -> {
             try (var comando = conexao.prepareStatement("""
-                    UPDATE notificacao SET reconhecida_em = ?, reconhecida_por = ?, observacao = ?
-                    WHERE id = ? AND reconhecida_em IS NULL
+                    UPDATE notificacao SET reconhecida_em = ?, reconhecida_por = ?, observacao = ?,
+                        atualizado_em = ?, atualizado_por = ?
+                    WHERE id = ? AND reconhecida_em IS NULL AND excluido_em IS NULL
                     """)) {
                 comando.setString(1, BancoDados.data(em));
                 comando.setString(2, por);
                 comando.setString(3, observacao);
-                comando.setLong(4, id);
+                comando.setString(4, BancoDados.data(em));
+                comando.setLong(5, autoria.usuario());
+                comando.setLong(6, id);
                 return comando.executeUpdate() == 1;
             }
         });
     }
 
-    private static long inserir(Connection conexao, Notificacao n) throws SQLException {
+    private static long inserir(Connection conexao, Notificacao n, long usuario) throws SQLException {
+        // a marcação de teste vem da barragem
         try (var comando = conexao.prepareStatement("""
                 INSERT INTO notificacao (barragem_id, instrumento, tipo_alerta, categoria, severidade, mensagem,
-                    leitura_suspeita, nivel_resposta, ocorrencias, criada_em, atualizada_em)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    leitura_suspeita, nivel_resposta, ocorrencias, criado_em, atualizado_em,
+                    criado_por, atualizado_por, teste)
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, teste FROM barragem WHERE id = ?
                 RETURNING id
                 """)) {
             comando.setString(1, n.barragem().valor());
@@ -150,18 +161,23 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
             comando.setInt(9, n.ocorrencias());
             comando.setString(10, BancoDados.data(n.criadaEm()));
             comando.setString(11, BancoDados.data(n.atualizadaEm()));
+            comando.setLong(12, usuario);
+            comando.setLong(13, usuario);
+            comando.setString(14, n.barragem().valor());
             try (var gerado = comando.executeQuery()) {
-                gerado.next();
+                if (!gerado.next()) {
+                    throw new SQLException("barragem não cadastrada: " + n.barragem());
+                }
                 return gerado.getLong(1);
             }
         }
     }
 
-    private static long atualizar(Connection conexao, Notificacao n) throws SQLException {
+    private static long atualizar(Connection conexao, Notificacao n, long usuario) throws SQLException {
         try (var comando = conexao.prepareStatement("""
                 UPDATE notificacao SET severidade = ?, mensagem = ?, leitura_suspeita = ?, nivel_resposta = ?,
-                    ocorrencias = ?, atualizada_em = ?
-                WHERE id = ? AND reconhecida_em IS NULL
+                    ocorrencias = ?, atualizado_em = ?, atualizado_por = ?
+                WHERE id = ? AND reconhecida_em IS NULL AND excluido_em IS NULL
                 """)) {
             comando.setString(1, n.severidade().name());
             comando.setString(2, n.mensagem());
@@ -169,7 +185,8 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
             comando.setInt(4, n.nivelResposta());
             comando.setInt(5, n.ocorrencias());
             comando.setString(6, BancoDados.data(n.atualizadaEm()));
-            comando.setLong(7, n.id());
+            comando.setLong(7, usuario);
+            comando.setLong(8, n.id());
             if (comando.executeUpdate() != 1) {
                 // reconhecida entre a leitura e a gravação: desfaz tudo; a próxima execução abre uma nova
                 throw new SQLException("A notificação " + n.id() + " não está mais aberta");
@@ -178,12 +195,18 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
         }
     }
 
-    private static void vincular(Connection conexao, long notificacao, List<Long> alertas) throws SQLException {
-        try (var comando = conexao.prepareStatement(
-                "UPDATE alerta SET notificacao_id = ? WHERE id = ? AND notificacao_id IS NULL")) {
+    private static void vincular(Connection conexao, long notificacao, List<Long> alertas, Autoria autoria)
+            throws SQLException {
+        try (var comando = conexao.prepareStatement("""
+                UPDATE alerta SET notificacao_id = ?, atualizado_em = ?, atualizado_por = ?
+                WHERE id = ? AND notificacao_id IS NULL
+                """)) {
+            var agora = autoria.agora();
             for (var alerta : alertas) {
                 comando.setLong(1, notificacao);
-                comando.setLong(2, alerta);
+                comando.setString(2, agora);
+                comando.setLong(3, autoria.usuario());
+                comando.setLong(4, alerta);
                 comando.addBatch();
             }
             comando.executeBatch();
@@ -191,7 +214,8 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
     }
 
     private static Optional<Notificacao> buscar(Connection conexao, long id) throws SQLException {
-        try (var consulta = conexao.prepareStatement("SELECT " + COLUNAS_NOTIFICACAO + " FROM notificacao WHERE id = ?")) {
+        try (var consulta = conexao.prepareStatement(
+                "SELECT " + COLUNAS_NOTIFICACAO + " FROM notificacao WHERE id = ? AND excluido_em IS NULL")) {
             consulta.setLong(1, id);
             try (var linhas = consulta.executeQuery()) {
                 return linhas.next() ? Optional.of(notificacao(linhas)) : Optional.empty();
@@ -212,8 +236,8 @@ public final class RepositorioNotificacoesJdbc implements RepositorioNotificacoe
                 linha.getInt("leitura_suspeita") == 1,
                 linha.getInt("nivel_resposta"),
                 linha.getInt("ocorrencias"),
-                Instant.parse(linha.getString("criada_em")),
-                Instant.parse(linha.getString("atualizada_em")),
+                Instant.parse(linha.getString("criado_em")),
+                Instant.parse(linha.getString("atualizado_em")),
                 reconhecidaEm == null
                         ? null
                         : new Notificacao.Reconhecimento(

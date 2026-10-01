@@ -1,6 +1,12 @@
 package br.com.damiq.desktop.inicializacao;
 
+import br.com.damiq.desktop.aplicacao.barragem.ExcluirBarragem;
 import br.com.damiq.desktop.aplicacao.barragem.RepositorioBarragens;
+import br.com.damiq.desktop.aplicacao.manutencao.LimparDadosTeste;
+import br.com.damiq.desktop.aplicacao.usuario.UsuarioCorrente;
+import br.com.damiq.desktop.dominio.usuario.UsuarioId;
+import br.com.damiq.desktop.infraestrutura.persistencia.Autoria;
+import br.com.damiq.desktop.infraestrutura.persistencia.RepositorioDadosTesteJdbc;
 import br.com.damiq.desktop.aplicacao.configuracao.AtualizarConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.FonteConfiguracao;
 import br.com.damiq.desktop.aplicacao.configuracao.RepositorioConfiguracoes;
@@ -87,14 +93,35 @@ public class ConfiguracaoAplicacao {
         return BancoDados.abrir(arquivo != null ? Path.of(arquivo) : diretorioDados(ambiente).resolve("damiq.db"));
     }
 
+    /** Até a autenticação (RF-01), toda alteração é do usuário "sistema". */
     @Bean
-    RepositorioBarragens repositorioBarragens(DataSource bancoDados, Clock relogio) {
-        return new RepositorioBarragensJdbc(bancoDados, relogio);
+    UsuarioCorrente usuarioCorrente() {
+        return () -> UsuarioId.SISTEMA;
     }
 
     @Bean
-    RepositorioConfiguracoes repositorioConfiguracoes(DataSource bancoDados) {
-        return new RepositorioConfiguracoesJdbc(bancoDados);
+    Autoria autoria(Clock relogio, UsuarioCorrente usuarioCorrente) {
+        return new Autoria(relogio, usuarioCorrente);
+    }
+
+    @Bean
+    RepositorioBarragens repositorioBarragens(DataSource bancoDados, Autoria autoria) {
+        return new RepositorioBarragensJdbc(bancoDados, autoria);
+    }
+
+    @Bean
+    RepositorioConfiguracoes repositorioConfiguracoes(DataSource bancoDados, Autoria autoria) {
+        return new RepositorioConfiguracoesJdbc(bancoDados, autoria);
+    }
+
+    @Bean
+    ExcluirBarragem excluirBarragem(RepositorioBarragens repositorioBarragens) {
+        return new ExcluirBarragem(repositorioBarragens);
+    }
+
+    @Bean
+    LimparDadosTeste limparDadosTeste(DataSource bancoDados) {
+        return new LimparDadosTeste(new RepositorioDadosTesteJdbc(bancoDados));
     }
 
     @Bean
@@ -126,8 +153,8 @@ public class ConfiguracaoAplicacao {
     }
 
     @Bean
-    RepositorioProcessamentos repositorioProcessamentos(DataSource bancoDados) {
-        return new RepositorioProcessamentosJdbc(bancoDados);
+    RepositorioProcessamentos repositorioProcessamentos(DataSource bancoDados, Autoria autoria) {
+        return new RepositorioProcessamentosJdbc(bancoDados, autoria);
     }
 
     @Bean
@@ -162,8 +189,8 @@ public class ConfiguracaoAplicacao {
     }
 
     @Bean
-    RepositorioNotificacoes repositorioNotificacoes(DataSource bancoDados) {
-        return new RepositorioNotificacoesJdbc(bancoDados);
+    RepositorioNotificacoes repositorioNotificacoes(DataSource bancoDados, Autoria autoria) {
+        return new RepositorioNotificacoesJdbc(bancoDados, autoria);
     }
 
     @Bean

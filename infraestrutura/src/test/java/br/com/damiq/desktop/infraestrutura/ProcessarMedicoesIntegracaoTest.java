@@ -1,5 +1,6 @@
 package br.com.damiq.desktop.infraestrutura;
 
+import br.com.damiq.desktop.infraestrutura.persistencia.AutoriaDeTeste;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,15 +44,15 @@ class ProcessarMedicoesIntegracaoTest {
     void montar() {
         var motor = MotorInstalado.exigir();
         var banco = BancoDados.abrir(diretorio.resolve("damiq.db"));
-        var barragens = new RepositorioBarragensJdbc(banco, Clock.systemUTC());
+        var barragens = new RepositorioBarragensJdbc(banco, AutoriaDeTeste.SISTEMA);
         barragens.salvar(new Barragem(JOAO_LEITE, "João Leite"));
-        var configuracoes = new RepositorioConfiguracoesJdbc(banco);
+        var configuracoes = new RepositorioConfiguracoesJdbc(banco, AutoriaDeTeste.SISTEMA);
         configuracoes.ativar(JOAO_LEITE, new Configuracao(new VersaoConfiguracao("21"), LoteExemplo.CONFIGURACAO),
                 OrigemConfiguracao.ARQUIVO, Instant.now());
         medicoes = new RepositorioMedicoesJdbc(banco);
         // relógio depois das leituras, para nenhuma ser recusada como futura
         var relogio = Clock.fixed(Instant.parse("2026-09-30T02:00:00Z"), ZoneOffset.UTC);
-        processar = new ProcessarMedicoes(barragens, configuracoes, medicoes, new RepositorioProcessamentosJdbc(banco),
+        processar = new ProcessarMedicoes(barragens, configuracoes, medicoes, new RepositorioProcessamentosJdbc(banco, AutoriaDeTeste.SISTEMA),
                 motor, evento -> {}, relogio, 48);
     }
 
