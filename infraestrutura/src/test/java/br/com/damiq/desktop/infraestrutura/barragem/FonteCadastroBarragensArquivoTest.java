@@ -1,12 +1,14 @@
 package br.com.damiq.desktop.infraestrutura.barragem;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.com.damiq.desktop.aplicacao.barragem.FalhaFonteCadastroException;
 import br.com.damiq.desktop.dominio.barragem.BarragemId;
+import br.com.damiq.desktop.dominio.barragem.GrupoCampos;
 import br.com.damiq.desktop.dominio.barragem.TipoCampo;
 import br.com.damiq.desktop.dominio.barragem.UnidadeFederativa;
 import java.io.IOException;
@@ -47,13 +49,21 @@ class FonteCadastroBarragensArquivoTest {
         assertEquals("3", cadastro.versao().valor());
         assertEquals(UnidadeFederativa.GO, cadastro.uf());
         assertEquals(129_000_000, cadastro.capacidadeTotalM3());
-        assertEquals(11, cadastro.campos().size());
+        assertEquals(8, cadastro.grupos().size());
+        assertEquals(new GrupoCampos("macico", "Maciço"), cadastro.grupos().getFirst());
+        assertEquals(13, cadastro.campos().size());
         var cotaCrista = cadastro.campos().get(1);
         assertEquals("cota_crista", cotaCrista.chave());
         assertEquals(752.5, cotaCrista.numero());
-        assertEquals("Maciço", cotaCrista.grupo());
+        assertEquals("macico", cotaCrista.grupo());
+        assertTrue(cotaCrista.padrao());
         assertEquals(TipoCampo.BOOLEANO, cadastro.campos().get(9).tipo());
         assertEquals("true", cadastro.campos().get(9).valor());
+        var proprio = cadastro.campos().getLast();
+        assertEquals("descarga_ecologica", proprio.chave());
+        assertEquals("abastecimento", proprio.grupo());
+        assertEquals("0.9", proprio.valor());
+        assertFalse(proprio.padrao());
     }
 
     @Test
@@ -80,6 +90,20 @@ class FonteCadastroBarragensArquivoTest {
 
         assertTrue(publicados.get(0).erro().contains("MOEDA"), publicados.get(0).erro());
         assertTrue(publicados.get(1).erro().contains("ponto decimal"), publicados.get(1).erro());
+    }
+
+    @Test
+    void campoEmGrupoInexistenteECampoSemPadrao() throws IOException {
+        var publicados = fonte("{\"barragens\": [%s, %s]}".formatted(
+                barragem("a", ", \"grupos\": [{\"chave\": \"macico\", \"nome\": \"Maciço\"}], \"campos\": "
+                        + "[{\"chave\": \"cota\", \"rotulo\": \"Cota\", \"grupo\": \"vertedouro\", \"tipo\": \"NUMERO\", \"valor\": 1}]"),
+                barragem("b", ", \"campos\": [{\"chave\": \"cota\", \"rotulo\": \"Cota\", \"tipo\": \"NUMERO\", \"valor\": 1}]")))
+                .buscar();
+
+        assertTrue(publicados.get(0).erro().contains("vertedouro"), publicados.get(0).erro());
+        var semGrupo = publicados.get(1).valido().orElseThrow().campos().getFirst();
+        assertNull(semGrupo.grupo());
+        assertFalse(semGrupo.padrao());
     }
 
     @Test

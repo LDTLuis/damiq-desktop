@@ -13,20 +13,24 @@ import org.junit.jupiter.params.provider.ValueSource;
 class CadastroBarragemTest {
 
     private static final BarragemId JOAO_LEITE = new BarragemId("joao-leite");
+    private static final GrupoCampos MACICO = new GrupoCampos("macico", "Maciço");
 
-    private static CadastroBarragem cadastro(List<String> municipios, double altura, List<CampoBarragem> campos) {
+    private static CadastroBarragem cadastro(
+            List<String> municipios, double altura, List<GrupoCampos> grupos, List<CampoBarragem> campos) {
         return new CadastroBarragem(JOAO_LEITE, new VersaoCadastro("3"), "João Leite", false, "SANEAGO",
                 "Abastecimento público", municipios, UnidadeFederativa.GO, new Coordenadas(-16.57, -49.21),
-                "Ribeirão João Leite", "CCR", altura, 129_000_000, campos);
+                "Ribeirão João Leite", "CCR", altura, 129_000_000, grupos, campos);
     }
 
-    private static CampoBarragem campo(String chave, TipoCampo tipo, String valor) {
-        return new CampoBarragem(chave, "Rótulo", "Grupo", tipo, valor, null);
+    private static CampoBarragem campo(String chave, String grupo, TipoCampo tipo, String valor) {
+        return new CampoBarragem(chave, "Rótulo", grupo, tipo, valor, null, true);
     }
 
     @Test
     void cadastroValido() {
-        var cadastro = cadastro(List.of(" Goiânia "), 50, List.of(campo("cota_crista", TipoCampo.NUMERO, "752.50")));
+        var cadastro = cadastro(List.of(" Goiânia "), 50, List.of(MACICO),
+                List.of(campo("cota_crista", "macico", TipoCampo.NUMERO, "752.50"),
+                        campo("sem_grupo", null, TipoCampo.TEXTO, "x")));
 
         assertEquals(List.of("Goiânia"), cadastro.municipios());
         assertEquals(new Barragem(JOAO_LEITE, "João Leite", false), cadastro.barragem());
@@ -35,22 +39,36 @@ class CadastroBarragemTest {
     }
 
     @Test
+    void campoEmGrupoQueNaoExisteNaBarragem() {
+        var falha = assertThrows(IllegalArgumentException.class, () -> cadastro(List.of("Goiânia"), 50, List.of(MACICO),
+                List.of(campo("largura_vertedouro", "vertedouro", TipoCampo.NUMERO, "50"))));
+
+        assertTrue(falha.getMessage().contains("vertedouro"), falha.getMessage());
+    }
+
+    @Test
+    void gruposComChaveRepetida() {
+        assertThrows(IllegalArgumentException.class, () -> cadastro(List.of("Goiânia"), 50,
+                List.of(MACICO, new GrupoCampos("macico", "Outro nome")), List.of()));
+    }
+
+    @Test
     void exigeAoMenosUmMunicipio() {
-        assertThrows(IllegalArgumentException.class, () -> cadastro(List.of(), 50, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> cadastro(List.of(), 50, List.of(), List.of()));
     }
 
     @ParameterizedTest
     @ValueSource(doubles = {0, -1, Double.NaN})
     void alturaDeveSerPositiva(double altura) {
-        assertThrows(IllegalArgumentException.class, () -> cadastro(List.of("Goiânia"), altura, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> cadastro(List.of("Goiânia"), altura, List.of(), List.of()));
     }
 
     @Test
     void camposComChaveRepetida() {
-        var campo = campo("cota_crista", TipoCampo.NUMERO, "752.5");
+        var campo = campo("cota_crista", null, TipoCampo.NUMERO, "752.5");
 
         var falha = assertThrows(IllegalArgumentException.class,
-                () -> cadastro(List.of("Goiânia"), 50, List.of(campo, campo)));
+                () -> cadastro(List.of("Goiânia"), 50, List.of(), List.of(campo, campo)));
 
         assertTrue(falha.getMessage().contains("cota_crista"));
     }
@@ -71,7 +89,7 @@ class CadastroBarragemTest {
         "TEXTO|  Portaria 946/2009  |Portaria 946/2009"
     })
     void valorNoFormatoCanonico(TipoCampo tipo, String valor, String canonico) {
-        assertEquals(canonico, campo("campo", tipo, valor).valor());
+        assertEquals(canonico, campo("campo", null, tipo, valor).valor());
     }
 
     @ParameterizedTest
@@ -80,7 +98,7 @@ class CadastroBarragemTest {
         "DATA|18/12/2009", "BOOLEANO|sim"
     })
     void valorIncompativelComOTipo(TipoCampo tipo, String valor) {
-        var falha = assertThrows(IllegalArgumentException.class, () -> campo("campo", tipo, valor));
+        var falha = assertThrows(IllegalArgumentException.class, () -> campo("campo", null, tipo, valor));
 
         assertTrue(falha.getMessage().startsWith("campo campo:"), falha.getMessage());
     }
@@ -88,11 +106,12 @@ class CadastroBarragemTest {
     @ParameterizedTest
     @ValueSource(strings = {"Cota", "cota crista", "1cota", "cota-crista"})
     void chaveInvalida(String chave) {
-        assertThrows(IllegalArgumentException.class, () -> campo(chave, TipoCampo.TEXTO, "x"));
+        assertThrows(IllegalArgumentException.class, () -> campo(chave, null, TipoCampo.TEXTO, "x"));
+        assertThrows(IllegalArgumentException.class, () -> new GrupoCampos(chave, "Grupo"));
     }
 
     @Test
     void numeroSoParaCampoNumerico() {
-        assertThrows(IllegalStateException.class, () -> campo("outorga", TipoCampo.TEXTO, "x").numero());
+        assertThrows(IllegalStateException.class, () -> campo("outorga", null, TipoCampo.TEXTO, "x").numero());
     }
 }

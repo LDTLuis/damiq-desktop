@@ -79,7 +79,7 @@ class SincronizarBarragensTest {
     private static CadastroBarragem cadastro(BarragemId id, String versao) {
         return new CadastroBarragem(id, new VersaoCadastro(versao), "Barragem " + id, false, "SANEAGO", "Abastecimento",
                 List.of("Goiânia"), UnidadeFederativa.GO, new Coordenadas(-16.57, -49.21), "Ribeirão", "CCR", 50,
-                129_000_000, List.of());
+                129_000_000, List.of(), List.of());
     }
 
     private ResultadoSincronizacao sincronizar(CadastroPublicado... publicados) {

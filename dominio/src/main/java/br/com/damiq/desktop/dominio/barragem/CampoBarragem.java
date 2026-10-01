@@ -8,13 +8,15 @@ import java.util.regex.Pattern;
  * para barragem (ex.: cota da crista, largura do vertedouro, área de drenagem).
  *
  * @param chave identificador estável do campo na barragem (minúsculas, números e {@code _}), ex.:
- *     {@code cota_crista}
+ *     {@code cota_crista}. Nos campos do catálogo, é a chave do catálogo e significa o mesmo em toda barragem
  * @param rotulo nome exibido, ex.: "Cota da crista"
- * @param grupo agrupamento na tela, ex.: "Maciço"; {@code null} se não houver
+ * @param grupo chave do {@link GrupoCampos} da barragem; {@code null} se o campo não estiver em um grupo
  * @param valor no formato canônico do {@link TipoCampo}
  * @param unidade ex.: {@code m}, {@code hm³}; {@code null} se não houver
+ * @param padrao campo do catálogo padrão da Central; {@code false} se foi criado só para esta barragem
  */
-public record CampoBarragem(String chave, String rotulo, String grupo, TipoCampo tipo, String valor, String unidade) {
+public record CampoBarragem(
+        String chave, String rotulo, String grupo, TipoCampo tipo, String valor, String unidade, boolean padrao) {
 
     private static final Pattern CHAVE = Pattern.compile("[a-z][a-z0-9_]{0,63}");
 

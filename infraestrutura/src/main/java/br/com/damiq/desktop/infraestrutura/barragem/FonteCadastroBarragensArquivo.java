@@ -8,6 +8,7 @@ import br.com.damiq.desktop.dominio.barragem.BarragemId;
 import br.com.damiq.desktop.dominio.barragem.CadastroBarragem;
 import br.com.damiq.desktop.dominio.barragem.CampoBarragem;
 import br.com.damiq.desktop.dominio.barragem.Coordenadas;
+import br.com.damiq.desktop.dominio.barragem.GrupoCampos;
 import br.com.damiq.desktop.dominio.barragem.TipoCampo;
 import br.com.damiq.desktop.dominio.barragem.UnidadeFederativa;
 import br.com.damiq.desktop.dominio.barragem.VersaoCadastro;
@@ -83,6 +84,7 @@ public final class FonteCadastroBarragensArquivo implements FonteCadastroBarrage
                     texto(item, "tipo_macico"),
                     numero(item, "altura_macico_m"),
                     numero(item, "capacidade_total_m3"),
+                    grupos(item.path("grupos")),
                     campos(item.path("campos")));
             return CadastroPublicado.valido(cadastro);
         } catch (RuntimeException e) {
@@ -158,8 +160,21 @@ public final class FonteCadastroBarragensArquivo implements FonteCadastroBarrage
                     texto(campo, "grupo"),
                     tipoCampo(tipo, texto(campo, "chave")),
                     valor.isValueNode() && !valor.isNull() ? valor.asString() : null,
-                    texto(campo, "unidade")));
+                    texto(campo, "unidade"),
+                    campo.path("padrao").asBoolean(false)));
         }
         return campos;
+    }
+
+    private static List<GrupoCampos> grupos(JsonNode lista) {
+        if (lista.isMissingNode() || lista.isNull()) {
+            return List.of();
+        }
+        if (!lista.isArray()) {
+            throw new IllegalArgumentException("grupos deve ser uma lista");
+        }
+        var grupos = new ArrayList<GrupoCampos>();
+        lista.forEach(grupo -> grupos.add(new GrupoCampos(texto(grupo, "chave"), texto(grupo, "nome"))));
+        return grupos;
     }
 }

@@ -15,7 +15,9 @@ import java.util.List;
  * @param alturaMacicoM altura do maciço, do ponto mais baixo da fundação à crista, em metros (critério da
  *     PNSB, Lei 12.334/2010)
  * @param capacidadeTotalM3 capacidade total do reservatório, em m³
- * @param campos campos próprios da barragem, na ordem de exibição; chaves únicas
+ * @param grupos grupos de campos da barragem, na ordem de exibição; chaves únicas
+ * @param campos campos próprios da barragem, na ordem de exibição; chaves únicas, cada um num grupo desta
+ *     barragem (ou sem grupo)
  */
 public record CadastroBarragem(
         BarragemId id,
@@ -31,6 +33,7 @@ public record CadastroBarragem(
         String tipoMacico,
         double alturaMacicoM,
         double capacidadeTotalM3,
+        List<GrupoCampos> grupos,
         List<CampoBarragem> campos) {
 
     public CadastroBarragem {
@@ -55,11 +58,22 @@ public record CadastroBarragem(
         if (!(Validacao.finito(capacidadeTotalM3, "capacidade total") > 0)) {
             throw new IllegalArgumentException("capacidade total deve ser positiva: " + capacidadeTotalM3);
         }
+        grupos = List.copyOf(Validacao.obrigatorio(grupos, "grupos"));
+        var chavesGrupos = new HashSet<String>();
+        for (var grupo : grupos) {
+            if (!chavesGrupos.add(grupo.chave())) {
+                throw new IllegalArgumentException("grupo repetido: " + grupo.chave());
+            }
+        }
         campos = List.copyOf(Validacao.obrigatorio(campos, "campos"));
         var chaves = new HashSet<String>();
         for (var campo : campos) {
             if (!chaves.add(campo.chave())) {
                 throw new IllegalArgumentException("campo repetido: " + campo.chave());
+            }
+            if (campo.grupo() != null && !chavesGrupos.contains(campo.grupo())) {
+                throw new IllegalArgumentException(
+                        "campo " + campo.chave() + ": grupo '" + campo.grupo() + "' não existe nesta barragem");
             }
         }
     }

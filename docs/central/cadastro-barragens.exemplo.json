@@ -15,18 +15,30 @@
       "tipo_macico": "Concreto compactado com rolo (CCR), com fechamento em terra nas ombreiras",
       "altura_macico_m": 50,
       "capacidade_total_m3": 129000000,
+      "grupos": [
+        { "chave": "macico", "nome": "Maciço" },
+        { "chave": "vertedouro", "nome": "Vertedouro" },
+        { "chave": "reservatorio", "nome": "Reservatório" },
+        { "chave": "hidrologia", "nome": "Hidrologia" },
+        { "chave": "historico", "nome": "Histórico" },
+        { "chave": "seguranca", "nome": "Segurança" },
+        { "chave": "regularizacao", "nome": "Regularização" },
+        { "chave": "abastecimento", "nome": "Abastecimento de Goiânia" }
+      ],
       "campos": [
-        { "chave": "comprimento_crista", "rotulo": "Comprimento da crista", "grupo": "Maciço", "tipo": "NUMERO", "valor": 451, "unidade": "m" },
-        { "chave": "cota_crista", "rotulo": "Cota da crista", "grupo": "Maciço", "tipo": "NUMERO", "valor": 752.5, "unidade": "m" },
-        { "chave": "cota_soleira_vertedouro", "rotulo": "Cota da soleira do vertedouro", "grupo": "Vertedouro", "tipo": "NUMERO", "valor": 749.0, "unidade": "m" },
-        { "chave": "largura_vertedouro", "rotulo": "Largura do vertedouro", "grupo": "Vertedouro", "tipo": "NUMERO", "valor": 50, "unidade": "m" },
-        { "chave": "vazao_cheia_projeto", "rotulo": "Vazão da cheia de projeto (PMP)", "grupo": "Vertedouro", "tipo": "NUMERO", "valor": 1236, "unidade": "m³/s" },
-        { "chave": "volume_util", "rotulo": "Volume útil", "grupo": "Reservatório", "tipo": "NUMERO", "valor": 117, "unidade": "hm³" },
-        { "chave": "volume_morto", "rotulo": "Volume morto", "grupo": "Reservatório", "tipo": "NUMERO", "valor": 12, "unidade": "hm³" },
-        { "chave": "area_drenagem", "rotulo": "Área de drenagem", "grupo": "Hidrologia", "tipo": "NUMERO", "valor": 763, "unidade": "km²" },
-        { "chave": "inicio_enchimento", "rotulo": "Início do enchimento", "grupo": "Histórico", "tipo": "DATA", "valor": "2009-12-18" },
-        { "chave": "possui_pae", "rotulo": "Possui PAE", "grupo": "Segurança", "tipo": "BOOLEANO", "valor": true },
-        { "chave": "outorga", "rotulo": "Outorga de uso da água", "grupo": "Regularização", "tipo": "TEXTO", "valor": "Portaria nº 946/2009 - GAB" }
+        { "chave": "comprimento_crista", "rotulo": "Comprimento da crista", "grupo": "macico", "tipo": "NUMERO", "valor": 451, "unidade": "m", "padrao": true },
+        { "chave": "cota_crista", "rotulo": "Cota da crista", "grupo": "macico", "tipo": "NUMERO", "valor": 752.5, "unidade": "m", "padrao": true },
+        { "chave": "cota_soleira_vertedouro", "rotulo": "Cota da soleira do vertedouro", "grupo": "vertedouro", "tipo": "NUMERO", "valor": 749.0, "unidade": "m", "padrao": true },
+        { "chave": "largura_vertedouro", "rotulo": "Largura do vertedouro", "grupo": "vertedouro", "tipo": "NUMERO", "valor": 50, "unidade": "m", "padrao": true },
+        { "chave": "vazao_cheia_projeto", "rotulo": "Vazão da cheia de projeto (PMP)", "grupo": "vertedouro", "tipo": "NUMERO", "valor": 1236, "unidade": "m³/s", "padrao": true },
+        { "chave": "volume_util", "rotulo": "Volume útil", "grupo": "reservatorio", "tipo": "NUMERO", "valor": 117, "unidade": "hm³", "padrao": true },
+        { "chave": "volume_morto", "rotulo": "Volume morto", "grupo": "reservatorio", "tipo": "NUMERO", "valor": 12, "unidade": "hm³", "padrao": true },
+        { "chave": "area_drenagem", "rotulo": "Área de drenagem", "grupo": "hidrologia", "tipo": "NUMERO", "valor": 763, "unidade": "km²", "padrao": true },
+        { "chave": "inicio_enchimento", "rotulo": "Início do enchimento", "grupo": "historico", "tipo": "DATA", "valor": "2009-12-18", "padrao": true },
+        { "chave": "possui_pae", "rotulo": "Possui PAE", "grupo": "seguranca", "tipo": "BOOLEANO", "valor": true, "padrao": true },
+        { "chave": "outorga", "rotulo": "Outorga de uso da água", "grupo": "regularizacao", "tipo": "TEXTO", "valor": "Portaria nº 946/2009 - GAB", "padrao": true },
+        { "chave": "vazao_abastecimento", "rotulo": "Vazão destinada ao abastecimento", "grupo": "abastecimento", "tipo": "NUMERO", "valor": 5.33, "unidade": "m³/s", "padrao": false },
+        { "chave": "descarga_ecologica", "rotulo": "Descarga ecológica mínima", "grupo": "abastecimento", "tipo": "NUMERO", "valor": 0.90, "unidade": "m³/s", "padrao": false }
       ]
     }
   ]

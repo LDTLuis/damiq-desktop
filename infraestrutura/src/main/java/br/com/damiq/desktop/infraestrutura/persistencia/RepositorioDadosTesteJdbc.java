@@ -16,7 +16,7 @@ public final class RepositorioDadosTesteJdbc implements RepositorioDadosTeste {
      */
     private static final List<String> TABELAS = List.of(
             "alerta", "notificacao", "rejeicao", "lacuna", "medicao", "processamento", "configuracao",
-            "barragem_campo", "barragem");
+            "barragem_campo", "barragem_grupo", "barragem");
 
     private final Jdbc jdbc;
 

@@ -7,21 +7,28 @@ import br.com.damiq.desktop.dominio.barragem.BarragemId;
 import br.com.damiq.desktop.dominio.barragem.CadastroBarragem;
 import br.com.damiq.desktop.dominio.barragem.CampoBarragem;
 import br.com.damiq.desktop.dominio.barragem.Coordenadas;
+import br.com.damiq.desktop.dominio.barragem.GrupoCampos;
 import br.com.damiq.desktop.dominio.barragem.TipoCampo;
 import br.com.damiq.desktop.dominio.barragem.UnidadeFederativa;
 import br.com.damiq.desktop.dominio.barragem.VersaoCadastro;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
 import javax.sql.DataSource;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
-/** {@link RepositorioBarragens} nas tabelas {@code barragem} e {@code barragem_campo}. */
+/** {@link RepositorioBarragens} nas tabelas {@code barragem}, {@code barragem_grupo} e {@code barragem_campo}. */
 public final class RepositorioBarragensJdbc implements RepositorioBarragens {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -128,7 +135,8 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
                             linha.getString("tipo_macico"),
                             linha.getDouble("altura_macico_m"),
                             linha.getDouble("capacidade_total_m3"),
-                            campos(conexao, id)));
+                            ordenados(gruposGravados(conexao, id).values(), GrupoGravado::ordem, GrupoGravado::grupo),
+                            ordenados(camposGravados(conexao, id).values(), CampoGravado::ordem, CampoGravado::campo)));
                 }
             }
         });
@@ -173,7 +181,8 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
                 comando.setLong(18, autoria.usuario());
                 comando.executeUpdate();
             }
-            gravarCampos(conexao, c, agora);
+            var idsGrupos = gravarGrupos(conexao, c, agora);
+            gravarCampos(conexao, c, idsGrupos, agora);
             return null;
         });
     }
@@ -195,19 +204,34 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
         });
     }
 
+    private record GrupoGravado(long id, GrupoCampos grupo, int ordem) {}
+
     private record CampoGravado(long id, CampoBarragem campo, int ordem) {}
 
-    private static List<CampoBarragem> campos(Connection conexao, BarragemId id) throws SQLException {
-        return camposGravados(conexao, id).values().stream()
-                .sorted((a, b) -> Integer.compare(a.ordem(), b.ordem()))
-                .map(CampoGravado::campo)
-                .toList();
+    private static <G, T> List<T> ordenados(Collection<G> gravados, ToIntFunction<G> ordem, Function<G, T> item) {
+        return gravados.stream().sorted(Comparator.comparingInt(ordem)).map(item).toList();
+    }
+
+    private static Map<String, GrupoGravado> gruposGravados(Connection conexao, BarragemId id) throws SQLException {
+        try (var consulta = conexao.prepareStatement(
+                "SELECT id, chave, nome, ordem FROM barragem_grupo WHERE barragem_id = ? AND excluido_em IS NULL")) {
+            consulta.setString(1, id.valor());
+            try (var linhas = consulta.executeQuery()) {
+                var grupos = new HashMap<String, GrupoGravado>();
+                while (linhas.next()) {
+                    var grupo = new GrupoCampos(linhas.getString("chave"), linhas.getString("nome"));
+                    grupos.put(grupo.chave(), new GrupoGravado(linhas.getLong("id"), grupo, linhas.getInt("ordem")));
+                }
+                return grupos;
+            }
+        }
     }
 
     private static Map<String, CampoGravado> camposGravados(Connection conexao, BarragemId id) throws SQLException {
         try (var consulta = conexao.prepareStatement("""
-                SELECT id, chave, rotulo, grupo, tipo, valor, unidade, ordem FROM barragem_campo
-                WHERE barragem_id = ? AND excluido_em IS NULL
+                SELECT c.id, c.chave, c.rotulo, g.chave AS grupo, c.tipo, c.valor, c.unidade, c.padrao, c.ordem
+                FROM barragem_campo c LEFT JOIN barragem_grupo g ON g.id = c.grupo_id
+                WHERE c.barragem_id = ? AND c.excluido_em IS NULL
                 """)) {
             consulta.setString(1, id.valor());
             try (var linhas = consulta.executeQuery()) {
@@ -215,7 +239,7 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
                 while (linhas.next()) {
                     var campo = new CampoBarragem(linhas.getString("chave"), linhas.getString("rotulo"),
                             linhas.getString("grupo"), TipoCampo.valueOf(linhas.getString("tipo")),
-                            linhas.getString("valor"), linhas.getString("unidade"));
+                            linhas.getString("valor"), linhas.getString("unidade"), linhas.getInt("padrao") == 1);
                     campos.put(campo.chave(), new CampoGravado(linhas.getLong("id"), campo, linhas.getInt("ordem")));
                 }
                 return campos;
@@ -223,17 +247,80 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
         }
     }
 
-    /** Insere os campos novos, atualiza os que mudaram e aplica exclusão lógica aos que saíram. */
-    private void gravarCampos(Connection conexao, CadastroBarragem c, String agora) throws SQLException {
-        var gravados = camposGravados(conexao, c.id());
+    /**
+     * Insere os grupos novos, atualiza os que mudaram e aplica exclusão lógica aos que saíram.
+     *
+     * @return id de cada grupo ativo, pela chave
+     */
+    private Map<String, Long> gravarGrupos(Connection conexao, CadastroBarragem c, String agora) throws SQLException {
+        var gravados = gruposGravados(conexao, c.id());
+        var ids = new HashMap<String, Long>();
         try (var inserir = conexao.prepareStatement("""
-                        INSERT INTO barragem_campo (barragem_id, chave, rotulo, grupo, tipo, valor, unidade, ordem,
+                        INSERT INTO barragem_grupo (barragem_id, chave, nome, ordem,
                             criado_em, criado_por, atualizado_em, atualizado_por, teste)
-                        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, teste FROM barragem WHERE id = ?
+                        SELECT ?, ?, ?, ?, ?, ?, ?, ?, teste FROM barragem WHERE id = ?
+                        RETURNING id
                         """);
                 var atualizar = conexao.prepareStatement("""
-                        UPDATE barragem_campo SET rotulo = ?, grupo = ?, tipo = ?, valor = ?, unidade = ?, ordem = ?,
-                            atualizado_em = ?, atualizado_por = ?
+                        UPDATE barragem_grupo SET nome = ?, ordem = ?, atualizado_em = ?, atualizado_por = ? WHERE id = ?
+                        """);
+                var excluir = conexao.prepareStatement("""
+                        UPDATE barragem_grupo SET excluido_em = ?, atualizado_em = ?, atualizado_por = ? WHERE id = ?
+                        """)) {
+            for (int ordem = 0; ordem < c.grupos().size(); ordem++) {
+                var grupo = c.grupos().get(ordem);
+                var gravado = gravados.remove(grupo.chave());
+                if (gravado == null) {
+                    inserir.setString(1, c.id().valor());
+                    inserir.setString(2, grupo.chave());
+                    inserir.setString(3, grupo.nome());
+                    inserir.setInt(4, ordem);
+                    inserir.setString(5, agora);
+                    inserir.setLong(6, autoria.usuario());
+                    inserir.setString(7, agora);
+                    inserir.setLong(8, autoria.usuario());
+                    inserir.setString(9, c.id().valor());
+                    try (var gerado = inserir.executeQuery()) {
+                        gerado.next();
+                        ids.put(grupo.chave(), gerado.getLong(1));
+                    }
+                } else {
+                    ids.put(grupo.chave(), gravado.id());
+                    if (!gravado.grupo().equals(grupo) || gravado.ordem() != ordem) {
+                        atualizar.setString(1, grupo.nome());
+                        atualizar.setInt(2, ordem);
+                        atualizar.setString(3, agora);
+                        atualizar.setLong(4, autoria.usuario());
+                        atualizar.setLong(5, gravado.id());
+                        atualizar.addBatch();
+                    }
+                }
+            }
+            for (var saiu : gravados.values()) {
+                excluir.setString(1, agora);
+                excluir.setString(2, agora);
+                excluir.setLong(3, autoria.usuario());
+                excluir.setLong(4, saiu.id());
+                excluir.addBatch();
+            }
+            atualizar.executeBatch();
+            excluir.executeBatch();
+        }
+        return ids;
+    }
+
+    /** Insere os campos novos, atualiza os que mudaram e aplica exclusão lógica aos que saíram. */
+    private void gravarCampos(Connection conexao, CadastroBarragem c, Map<String, Long> idsGrupos, String agora)
+            throws SQLException {
+        var gravados = camposGravados(conexao, c.id());
+        try (var inserir = conexao.prepareStatement("""
+                        INSERT INTO barragem_campo (barragem_id, grupo_id, chave, rotulo, tipo, valor, unidade, padrao,
+                            ordem, criado_em, criado_por, atualizado_em, atualizado_por, teste)
+                        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, teste FROM barragem WHERE id = ?
+                        """);
+                var atualizar = conexao.prepareStatement("""
+                        UPDATE barragem_campo SET grupo_id = ?, rotulo = ?, tipo = ?, valor = ?, unidade = ?,
+                            padrao = ?, ordem = ?, atualizado_em = ?, atualizado_por = ?
                         WHERE id = ?
                         """);
                 var excluir = conexao.prepareStatement("""
@@ -241,32 +328,35 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
                         """)) {
             for (int ordem = 0; ordem < c.campos().size(); ordem++) {
                 var campo = c.campos().get(ordem);
+                var grupo = campo.grupo() == null ? null : idsGrupos.get(campo.grupo());
                 var gravado = gravados.remove(campo.chave());
                 if (gravado == null) {
                     inserir.setString(1, c.id().valor());
-                    inserir.setString(2, campo.chave());
-                    inserir.setString(3, campo.rotulo());
-                    inserir.setString(4, campo.grupo());
+                    definirGrupo(inserir, 2, grupo);
+                    inserir.setString(3, campo.chave());
+                    inserir.setString(4, campo.rotulo());
                     inserir.setString(5, campo.tipo().name());
                     inserir.setString(6, campo.valor());
                     inserir.setString(7, campo.unidade());
-                    inserir.setInt(8, ordem);
-                    inserir.setString(9, agora);
-                    inserir.setLong(10, autoria.usuario());
-                    inserir.setString(11, agora);
-                    inserir.setLong(12, autoria.usuario());
-                    inserir.setString(13, c.id().valor());
+                    inserir.setInt(8, campo.padrao() ? 1 : 0);
+                    inserir.setInt(9, ordem);
+                    inserir.setString(10, agora);
+                    inserir.setLong(11, autoria.usuario());
+                    inserir.setString(12, agora);
+                    inserir.setLong(13, autoria.usuario());
+                    inserir.setString(14, c.id().valor());
                     inserir.addBatch();
                 } else if (!gravado.campo().equals(campo) || gravado.ordem() != ordem) {
-                    atualizar.setString(1, campo.rotulo());
-                    atualizar.setString(2, campo.grupo());
+                    definirGrupo(atualizar, 1, grupo);
+                    atualizar.setString(2, campo.rotulo());
                     atualizar.setString(3, campo.tipo().name());
                     atualizar.setString(4, campo.valor());
                     atualizar.setString(5, campo.unidade());
-                    atualizar.setInt(6, ordem);
-                    atualizar.setString(7, agora);
-                    atualizar.setLong(8, autoria.usuario());
-                    atualizar.setLong(9, gravado.id());
+                    atualizar.setInt(6, campo.padrao() ? 1 : 0);
+                    atualizar.setInt(7, ordem);
+                    atualizar.setString(8, agora);
+                    atualizar.setLong(9, autoria.usuario());
+                    atualizar.setLong(10, gravado.id());
                     atualizar.addBatch();
                 }
             }
@@ -280,6 +370,14 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
             inserir.executeBatch();
             atualizar.executeBatch();
             excluir.executeBatch();
+        }
+    }
+
+    private static void definirGrupo(PreparedStatement comando, int posicao, Long grupo) throws SQLException {
+        if (grupo == null) {
+            comando.setNull(posicao, Types.INTEGER);
+        } else {
+            comando.setLong(posicao, grupo);
         }
     }
 }
