@@ -1,6 +1,7 @@
 package br.com.damiq.desktop.dominio.barragem;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,7 +20,20 @@ class CadastroBarragemTest {
             List<String> municipios, double altura, List<GrupoCampos> grupos, List<CampoBarragem> campos) {
         return new CadastroBarragem(JOAO_LEITE, new VersaoCadastro("3"), "João Leite", false, "SANEAGO",
                 "Abastecimento público", municipios, UnidadeFederativa.GO, new Coordenadas(-16.57, -49.21),
-                "Ribeirão João Leite", "CCR", altura, 129_000_000, grupos, campos);
+                "Ribeirão João Leite", "CCR", altura, 129_000_000, grupos, campos, List.of());
+    }
+
+    private static final MeioContato CELULAR = new MeioContato(MeioContato.Tipo.CELULAR, "(62) 99999-0001");
+
+    private static CadastroBarragem comContatos(ContatoBarragem... contatos) {
+        return new CadastroBarragem(JOAO_LEITE, new VersaoCadastro("3"), "João Leite", false, "SANEAGO",
+                "Abastecimento público", List.of("Goiânia"), UnidadeFederativa.GO, new Coordenadas(-16.57, -49.21),
+                "Ribeirão João Leite", "CCR", 50, 129_000_000, List.of(), List.of(), List.of(contatos));
+    }
+
+    private static ContatoBarragem contato(String chave, Integer nivel, String substitui, MeioContato... meios) {
+        return new ContatoBarragem(chave, PapelContato.COORDENADOR_PAE, "Empresa", "Fulano", null, List.of(meios),
+                nivel, substitui, false);
     }
 
     private static CampoBarragem campo(String chave, String grupo, TipoCampo tipo, String valor) {
@@ -113,5 +127,80 @@ class CadastroBarragemTest {
     @Test
     void numeroSoParaCampoNumerico() {
         assertThrows(IllegalStateException.class, () -> campo("outorga", null, TipoCampo.TEXTO, "x").numero());
+    }
+
+    @Test
+    void contatoComSubstituto() {
+        var cadastro = comContatos(contato("coordenador_pae", 1, null, CELULAR),
+                contato("coordenador_substituto", null, "coordenador_pae", CELULAR));
+
+        var titular = cadastro.contatos().getFirst();
+        assertTrue(titular.acionadoNo(1));
+        assertTrue(titular.acionadoNo(3));
+        assertFalse(titular.acionadoNo(0));
+    }
+
+    @Test
+    void contatosComChaveRepetida() {
+        var falha = assertThrows(IllegalArgumentException.class, () -> comContatos(
+                contato("coordenador_pae", 1, null, CELULAR), contato("coordenador_pae", 2, null, CELULAR)));
+
+        assertTrue(falha.getMessage().contains("coordenador_pae"), falha.getMessage());
+    }
+
+    @Test
+    void substitutoDeContatoQueNaoExiste() {
+        var falha = assertThrows(IllegalArgumentException.class,
+                () -> comContatos(contato("coordenador_substituto", null, "coordenador_pae", CELULAR)));
+
+        assertTrue(falha.getMessage().contains("não existe"), falha.getMessage());
+    }
+
+    @Test
+    void substitutoDeSubstituto() {
+        assertThrows(IllegalArgumentException.class, () -> comContatos(contato("titular", 1, null, CELULAR),
+                contato("substituto", null, "titular", CELULAR), contato("outro", null, "substituto", CELULAR)));
+    }
+
+    @Test
+    void substitutoHerdaONivelDoTitular() {
+        assertThrows(IllegalArgumentException.class, () -> comContatos(contato("titular", 1, null, CELULAR),
+                contato("substituto", 2, "titular", CELULAR)));
+        assertEquals(2, comContatos(contato("titular", 1, null, CELULAR), contato("substituto", 1, "titular", CELULAR))
+                .contatos().size());
+    }
+
+    @Test
+    void contatoAcionadoPrecisaDeMeioDeContato() {
+        assertThrows(IllegalArgumentException.class, () -> contato("coordenador_pae", 1, null));
+        assertThrows(IllegalArgumentException.class, () -> comContatos(contato("titular", 1, null, CELULAR),
+                contato("substituto", null, "titular")));
+        // fora do fluxo de notificação (ex.: só recebe cópia do PAE), o meio de contato é opcional
+        assertEquals(1, comContatos(contato("prefeitura", null, null)).contatos().size());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 4, -1})
+    void nivelDeAcionamentoEntre1E3(int nivel) {
+        assertThrows(IllegalArgumentException.class, () -> contato("coordenador_pae", nivel, null, CELULAR));
+    }
+
+    @Test
+    void contatoNaoSubstituiASiMesmo() {
+        assertThrows(IllegalArgumentException.class, () -> contato("coordenador_pae", 1, "coordenador_pae", CELULAR));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"EMAIL|sem-arroba", "EMAIL|a@b@c", "CELULAR|não tem", "TELEFONE|()"})
+    void meioDeContatoInvalido(MeioContato.Tipo tipo, String valor) {
+        assertThrows(IllegalArgumentException.class, () -> new MeioContato(tipo, valor));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "EMAIL|coordenacao@exemplo.com.br", "CELULAR|+55 (62) 99999-0001", "TELEFONE|0800 000 0000", "RADIO|Canal 3"
+    })
+    void meioDeContatoValido(MeioContato.Tipo tipo, String valor) {
+        assertEquals(valor, new MeioContato(tipo, " " + valor + " ").valor());
     }
 }

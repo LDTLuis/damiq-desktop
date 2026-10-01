@@ -6,8 +6,11 @@ import br.com.damiq.desktop.dominio.barragem.Barragem;
 import br.com.damiq.desktop.dominio.barragem.BarragemId;
 import br.com.damiq.desktop.dominio.barragem.CadastroBarragem;
 import br.com.damiq.desktop.dominio.barragem.CampoBarragem;
+import br.com.damiq.desktop.dominio.barragem.ContatoBarragem;
 import br.com.damiq.desktop.dominio.barragem.Coordenadas;
 import br.com.damiq.desktop.dominio.barragem.GrupoCampos;
+import br.com.damiq.desktop.dominio.barragem.MeioContato;
+import br.com.damiq.desktop.dominio.barragem.PapelContato;
 import br.com.damiq.desktop.dominio.barragem.TipoCampo;
 import br.com.damiq.desktop.dominio.barragem.UnidadeFederativa;
 import br.com.damiq.desktop.dominio.barragem.VersaoCadastro;
@@ -28,7 +31,10 @@ import javax.sql.DataSource;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
-/** {@link RepositorioBarragens} nas tabelas {@code barragem}, {@code barragem_grupo} e {@code barragem_campo}. */
+/**
+ * {@link RepositorioBarragens} nas tabelas {@code barragem}, {@code barragem_grupo}, {@code barragem_campo} e
+ * {@code barragem_contato}.
+ */
 public final class RepositorioBarragensJdbc implements RepositorioBarragens {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -136,7 +142,9 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
                             linha.getDouble("altura_macico_m"),
                             linha.getDouble("capacidade_total_m3"),
                             ordenados(gruposGravados(conexao, id).values(), GrupoGravado::ordem, GrupoGravado::grupo),
-                            ordenados(camposGravados(conexao, id).values(), CampoGravado::ordem, CampoGravado::campo)));
+                            ordenados(camposGravados(conexao, id).values(), CampoGravado::ordem, CampoGravado::campo),
+                            ordenados(contatosGravados(conexao, id).values(), ContatoGravado::ordem,
+                                    ContatoGravado::contato)));
                 }
             }
         });
@@ -183,6 +191,7 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
             }
             var idsGrupos = gravarGrupos(conexao, c, agora);
             gravarCampos(conexao, c, idsGrupos, agora);
+            gravarContatos(conexao, c, agora);
             return null;
         });
     }
@@ -207,6 +216,8 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
     private record GrupoGravado(long id, GrupoCampos grupo, int ordem) {}
 
     private record CampoGravado(long id, CampoBarragem campo, int ordem) {}
+
+    private record ContatoGravado(long id, ContatoBarragem contato, int ordem) {}
 
     private static <G, T> List<T> ordenados(Collection<G> gravados, ToIntFunction<G> ordem, Function<G, T> item) {
         return gravados.stream().sorted(Comparator.comparingInt(ordem)).map(item).toList();
@@ -379,5 +390,98 @@ public final class RepositorioBarragensJdbc implements RepositorioBarragens {
         } else {
             comando.setLong(posicao, grupo);
         }
+    }
+
+    private static Map<String, ContatoGravado> contatosGravados(Connection conexao, BarragemId id) throws SQLException {
+        try (var consulta = conexao.prepareStatement("""
+                SELECT id, chave, papel, entidade, responsavel, cargo, meios, nivel_acionamento, substitui,
+                       recebe_copia_pae, ordem
+                FROM barragem_contato WHERE barragem_id = ? AND excluido_em IS NULL
+                """)) {
+            consulta.setString(1, id.valor());
+            try (var linhas = consulta.executeQuery()) {
+                var contatos = new HashMap<String, ContatoGravado>();
+                while (linhas.next()) {
+                    var lido = linhas.getInt("nivel_acionamento");
+                    Integer nivel = linhas.wasNull() ? null : lido;
+                    var contato = new ContatoBarragem(linhas.getString("chave"),
+                            PapelContato.valueOf(linhas.getString("papel")), linhas.getString("entidade"),
+                            linhas.getString("responsavel"), linhas.getString("cargo"),
+                            JSON.readValue(linhas.getString("meios"), new TypeReference<List<MeioContato>>() {}),
+                            nivel, linhas.getString("substitui"),
+                            linhas.getInt("recebe_copia_pae") == 1);
+                    contatos.put(contato.chave(), new ContatoGravado(linhas.getLong("id"), contato, linhas.getInt("ordem")));
+                }
+                return contatos;
+            }
+        }
+    }
+
+    /** Insere os contatos novos, atualiza os que mudaram e aplica exclusão lógica aos que saíram. */
+    private void gravarContatos(Connection conexao, CadastroBarragem c, String agora) throws SQLException {
+        var gravados = contatosGravados(conexao, c.id());
+        try (var inserir = conexao.prepareStatement("""
+                        INSERT INTO barragem_contato (papel, entidade, responsavel, cargo, meios, nivel_acionamento,
+                            substitui, recebe_copia_pae, ordem, atualizado_em, atualizado_por,
+                            barragem_id, chave, criado_em, criado_por, teste)
+                        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, teste FROM barragem WHERE id = ?
+                        """);
+                var atualizar = conexao.prepareStatement("""
+                        UPDATE barragem_contato SET papel = ?, entidade = ?, responsavel = ?, cargo = ?, meios = ?,
+                            nivel_acionamento = ?, substitui = ?, recebe_copia_pae = ?, ordem = ?,
+                            atualizado_em = ?, atualizado_por = ?
+                        WHERE id = ?
+                        """);
+                var excluir = conexao.prepareStatement("""
+                        UPDATE barragem_contato SET excluido_em = ?, atualizado_em = ?, atualizado_por = ? WHERE id = ?
+                        """)) {
+            for (int ordem = 0; ordem < c.contatos().size(); ordem++) {
+                var contato = c.contatos().get(ordem);
+                var gravado = gravados.remove(contato.chave());
+                if (gravado == null) {
+                    definirContato(inserir, contato, ordem, agora);
+                    inserir.setString(12, c.id().valor());
+                    inserir.setString(13, contato.chave());
+                    inserir.setString(14, agora);
+                    inserir.setLong(15, autoria.usuario());
+                    inserir.setString(16, c.id().valor());
+                    inserir.addBatch();
+                } else if (!gravado.contato().equals(contato) || gravado.ordem() != ordem) {
+                    definirContato(atualizar, contato, ordem, agora);
+                    atualizar.setLong(12, gravado.id());
+                    atualizar.addBatch();
+                }
+            }
+            for (var saiu : gravados.values()) {
+                excluir.setString(1, agora);
+                excluir.setString(2, agora);
+                excluir.setLong(3, autoria.usuario());
+                excluir.setLong(4, saiu.id());
+                excluir.addBatch();
+            }
+            inserir.executeBatch();
+            atualizar.executeBatch();
+            excluir.executeBatch();
+        }
+    }
+
+    /** Parâmetros 1 a 11, comuns à inclusão e à atualização do contato. */
+    private void definirContato(PreparedStatement comando, ContatoBarragem contato, int ordem, String agora)
+            throws SQLException {
+        comando.setString(1, contato.papel().name());
+        comando.setString(2, contato.entidade());
+        comando.setString(3, contato.responsavel());
+        comando.setString(4, contato.cargo());
+        comando.setString(5, JSON.writeValueAsString(contato.meios()));
+        if (contato.nivelAcionamento() == null) {
+            comando.setNull(6, Types.INTEGER);
+        } else {
+            comando.setInt(6, contato.nivelAcionamento());
+        }
+        comando.setString(7, contato.substitui());
+        comando.setInt(8, contato.recebeCopiaPae() ? 1 : 0);
+        comando.setInt(9, ordem);
+        comando.setString(10, agora);
+        comando.setLong(11, autoria.usuario());
     }
 }

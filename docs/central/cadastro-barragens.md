@@ -73,6 +73,7 @@ A lista é **completa**: traz todas as barragens que o Desktop deve ter.
 | `teste` | booleano | Barragem de teste (UAT, RF-13): todos os seus dados no Desktop são de teste e podem ser apagados. **Só vale no primeiro cadastro** |
 | `grupos` | lista | Grupos de campos desta barragem (abaixo) |
 | `campos` | lista | Campos próprios desta barragem (abaixo) |
+| `contatos` | lista | Contatos do PAE e ordem de acionamento ([abaixo](#contatos-do-pae-e-ordem-de-acionamento)) |
 
 ## Catálogo padrão, grupos e campos próprios
 
@@ -142,16 +143,66 @@ Cada barragem tem a **sua tabela de grupos**, na ordem de exibição.
 
 A ordem das listas é a ordem de exibição (grupos, e campos dentro de cada grupo).
 
+## Contatos do PAE e ordem de acionamento
+
+Cada barragem traz a lista de contatos do seu PAE (identificação e contatos, PAE §2; responsabilidades, §7;
+entidades que recebem cópia, §12) e, para cada um, o **nível de resposta a partir do qual ele é acionado**.
+O Desktop usa essa lista para mostrar, em cada notificação de alerta, **quem acionar e em que ordem** (RF-06).
+
+O fluxograma de notificação do PAE é cumulativo: cada nível aciona os contatos do nível anterior e mais alguns.
+
+| Nível | Quem é acionado (PAE §6.1 e §7.2) |
+|---|---|
+| 1 – verde | Equipe técnica → coordenador do PAE → empreendedor. A notificação é interna e termina no empreendedor |
+| 2 – amarelo | + entidade fiscalizadora (ex.: SEMAD). O coordenador do PAE mobiliza a operação de emergência |
+| 3 – vermelho | + Defesa Civil municipal e estadual, que alertam a população da ZAS. O coordenador **não** fala direto com a população |
+
+```json
+"contatos": [
+  { "chave": "coordenador_pae", "papel": "COORDENADOR_PAE", "entidade": "Empresa de Saneamento",
+    "responsavel": "Nome do coordenador", "cargo": "Coordenador do PAE",
+    "meios": [ { "tipo": "CELULAR", "valor": "(62) 99999-0000" }, { "tipo": "EMAIL", "valor": "pae@empresa.com.br" } ],
+    "nivel_acionamento": 1, "recebe_copia_pae": true },
+  { "chave": "coordenador_pae_substituto", "papel": "COORDENADOR_PAE", "entidade": "Empresa de Saneamento",
+    "responsavel": "Nome do substituto", "meios": [ { "tipo": "CELULAR", "valor": "(62) 99999-0001" } ],
+    "substitui": "coordenador_pae" },
+  { "chave": "defesa_civil_municipal", "papel": "DEFESA_CIVIL", "entidade": "Defesa Civil Municipal",
+    "meios": [ { "tipo": "TELEFONE", "valor": "199" } ], "nivel_acionamento": 3 }
+]
+```
+
+| Campo | Obrigatório | Regra |
+|---|---|---|
+| `chave` | sim | Identificador estável do contato na barragem (mesma regra da chave do grupo). Única na barragem |
+| `papel` | sim | `EQUIPE_TECNICA`, `COORDENADOR_PAE`, `EMPREENDEDOR`, `ENTIDADE_FISCALIZADORA`, `DEFESA_CIVIL`, `CONSULTOR_EXTERNO` ou `OUTRO` |
+| `entidade` | sim | Órgão ou empresa |
+| `responsavel` | não | Pessoa a contatar. O PAE pede o contato **direto com o responsável** (§6.1.2.2); informe sempre que houver |
+| `cargo` | não | |
+| `meios` | se acionado | Lista **na ordem de preferência**, cada um com `tipo` (`CELULAR`, `TELEFONE`, `EMAIL`, `RADIO`, `OUTRO`) e `valor`. O PAE recomenda o celular de viva voz e o e-mail como complemento. Obrigatório (ao menos um) para contatos acionados e para substitutos de contatos acionados |
+| `nivel_acionamento` | não | `1`, `2` ou `3`: nível a partir do qual o contato é acionado. Ausente: o contato não está no fluxo de notificação (ex.: só recebe cópia do PAE) |
+| `substitui` | não | Chave do titular que este contato substitui quando o titular não é encontrado (ex.: coordenador substituto do PAE). O titular não pode ser ele mesmo um substituto. O substituto **herda o nível** do titular: não informe outro |
+| `recebe_copia_pae` | não | `true` se a entidade recebe cópia do PAE (§12) |
+
+**A ordem da lista é a ordem de acionamento dentro de cada nível.** Entre níveis, o Desktop ordena do verde
+para o vermelho.
+
+Ao montar a lista de acionamento, o Desktop aponta como **pendência** o papel que o PAE prevê no nível e que
+não tem contato: coordenador do PAE e empreendedor (nível 1), entidade fiscalizadora (2) e Defesa Civil (3).
+A Central deve alertar sobre essas faltas ao publicar, sem impedir a publicação (há barragens sem PAE).
+
+> Contatos são dados pessoais (LGPD): publique só o necessário ao PAE. Os exemplos deste repositório usam
+> nomes e números fictícios.
+
 ## Comportamento no Desktop
 
 | Situação | O que acontece |
 |---|---|
 | Barragem nova na lista | Cadastrada |
-| `versao` diferente da guardada | Dados atualizados; grupos e campos novos são incluídos, alterados são atualizados e os que saíram recebem exclusão lógica |
+| `versao` diferente da guardada | Dados atualizados; grupos, campos e contatos novos são incluídos, alterados são atualizados e os que saíram recebem exclusão lógica |
 | Mesma `versao` | Nada muda |
 | Barragem que estava excluída volta à lista | Reativada |
 | Barragem saiu da lista | **Exclusão lógica**: some das telas e deixa de aceitar medições; os dados continuam gravados |
-| Cadastro inválido (obrigatório ausente, valor fora da regra, campo num grupo que não existe) | **Recusado**: a cópia anterior dessa barragem é mantida e o erro vai para o log |
+| Cadastro inválido (obrigatório ausente, valor fora da regra, campo num grupo que não existe, contato acionado sem meio de contato, substituto de um contato que não existe) | **Recusado**: a cópia anterior dessa barragem é mantida e o erro vai para o log |
 | Arquivo ausente, JSON ilegível, sem `barragens` ou nenhum cadastro válido | **Nada é alterado** |
 
 Na Central, aplique as mesmas regras na validação dos formulários, para que um cadastro inválido nunca seja
@@ -161,5 +212,7 @@ publicado.
 
 - Lista oficial de campos do cadastro estadual (SEMAD, IN 01/2020) e do SNISB (ANA): quando disponível, entra
   no catálogo, e os campos exigidos podem virar obrigatórios.
-- Contatos e ordem de acionamento do PAE, estruturas associadas e ZAS: entram como listas próprias do
-  cadastro numa próxima versão deste contrato.
+- Estruturas associadas e ZAS: entram como listas próprias do cadastro numa próxima versão deste contrato.
+- O mapeamento entre severidade e nível de resposta (OK 0, AVISO 1 verde, ALERTA 2 amarelo, CRITICO 3
+  vermelho) é do motor e ainda será validado com o professor. O PAE do João Leite junta o laranja da ANA ao
+  amarelo; um PAE com quatro níveis precisaria de outro mapeamento.
