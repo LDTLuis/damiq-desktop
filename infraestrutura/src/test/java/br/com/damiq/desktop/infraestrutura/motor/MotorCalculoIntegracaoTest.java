@@ -3,36 +3,20 @@ package br.com.damiq.desktop.infraestrutura.motor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import br.com.damiq.desktop.dominio.configuracao.Configuracao;
 import br.com.damiq.desktop.dominio.configuracao.VersaoConfiguracao;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-/**
- * Executa o motor real, instalado a partir da release (ver README). Sem o motor, os testes são pulados, a
- * menos que {@code DAMIQ_MOTOR_OBRIGATORIO=true} (CI).
- */
+/** Executa o motor real, instalado a partir da release (ver {@link MotorInstalado} e o README). */
 class MotorCalculoIntegracaoTest {
 
     private static MotorCalculoProcessBuilder motor;
 
     @BeforeAll
     static void localizarMotor() {
-        var variavel = System.getenv("DAMIQ_MOTOR_PYTHON");
-        var python = variavel != null && !variavel.isBlank()
-                ? Path.of(variavel)
-                : ConfiguracaoMotor.pythonDoAmbienteLocal(Path.of(System.getProperty("damiq.raiz", "..")));
-        var instalado = Files.isExecutable(python);
-        if (!instalado && Boolean.parseBoolean(System.getenv("DAMIQ_MOTOR_OBRIGATORIO"))) {
-            throw new IllegalStateException("Motor de cálculo não encontrado em " + python);
-        }
-        assumeTrue(instalado, "Motor de cálculo não instalado em " + python);
-        motor = new MotorCalculoProcessBuilder(ConfiguracaoMotor.python(python, Duration.ofSeconds(60)));
+        motor = MotorInstalado.exigir();
     }
 
     private static Configuracao configuracao(String json) {
