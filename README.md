@@ -48,6 +48,17 @@ O banco SQLite (`damiq.db`) e os arquivos de configuração ficam no diretório 
 O esquema é criado e atualizado pelo Flyway ao iniciar, a partir de
 [`db/migracao`](infraestrutura/src/main/resources/db/migracao).
 
+**Regras do banco:**
+
+- A **barragem é o cadastro principal**: todo dado, de cálculo ou de usuário, pertence a uma barragem.
+- Toda tabela tem as colunas de controle `criado_em`, `criado_por`, `atualizado_em`, `atualizado_por`
+  (usuário; até a autenticação, o usuário 1, "sistema"), `excluido_em` e `teste`.
+- **Exclusão lógica**: excluir preenche `excluido_em`; o registro some das consultas mas continua gravado.
+  Unicidades (ex.: uma medição por instrumento e horário) valem só entre os registros não excluídos.
+- **Dados de teste**: uma barragem cadastrada como teste passa a marcação a todos os seus dados, que podem
+  ser apagados fisicamente (`LimparDadosTeste`). O banco recusa apagar fisicamente qualquer registro com
+  `teste = 0`.
+
 Até a Central existir, a configuração de cada barragem é lida de `<dados>/configuracoes/<id da barragem>.json`,
 no formato da seção `configuracao` do contrato do motor, e só passa a valer depois de validada pelo motor.
 

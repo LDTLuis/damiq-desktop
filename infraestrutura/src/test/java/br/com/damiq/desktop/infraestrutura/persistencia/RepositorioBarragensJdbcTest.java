@@ -22,7 +22,7 @@ class RepositorioBarragensJdbcTest {
 
     @BeforeEach
     void criarBanco() {
-        repositorio = new RepositorioBarragensJdbc(BancoDados.abrir(diretorio.resolve("damiq.db")), Clock.systemUTC());
+        repositorio = new RepositorioBarragensJdbc(BancoDados.abrir(diretorio.resolve("damiq.db")), AutoriaDeTeste.SISTEMA);
     }
 
     @Test

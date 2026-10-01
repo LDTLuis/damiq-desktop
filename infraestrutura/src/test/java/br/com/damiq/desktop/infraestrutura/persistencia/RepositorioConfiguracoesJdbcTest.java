@@ -37,10 +37,10 @@ class RepositorioConfiguracoesJdbcTest {
     @BeforeEach
     void criarBanco() {
         banco = BancoDados.abrir(diretorio.resolve("damiq.db"));
-        var barragens = new RepositorioBarragensJdbc(banco, Clock.fixed(AGORA, ZoneOffset.UTC));
+        var barragens = new RepositorioBarragensJdbc(banco, AutoriaDeTeste.em(AGORA));
         barragens.salvar(new Barragem(JOAO_LEITE, "João Leite"));
         barragens.salvar(new Barragem(OUTRA, "Outra"));
-        repositorio = new RepositorioConfiguracoesJdbc(banco);
+        repositorio = new RepositorioConfiguracoesJdbc(banco, AutoriaDeTeste.em(AGORA));
     }
 
     private static Configuracao configuracao(String versao) {
@@ -78,8 +78,11 @@ class RepositorioConfiguracoesJdbcTest {
 
         assertEquals(configuracao("21"), repositorio.vigente(JOAO_LEITE).orElseThrow());
         assertEquals(
-                List.of("joao-leite|21|ARQUIVO|2026-10-01T13:45:00.000Z|1"),
-                linhas("SELECT barragem_id, versao, origem, recebida_em, vigente FROM configuracao"));
+                List.of("joao-leite|21|ARQUIVO|1|2026-10-01T13:45:00.000Z|1|2026-10-01T13:45:00.000Z|1|null|0"),
+                linhas("""
+                        SELECT barragem_id, versao, origem, vigente, criado_em, criado_por, atualizado_em,
+                               atualizado_por, excluido_em, teste
+                        FROM configuracao"""));
     }
 
     @Test
@@ -124,7 +127,8 @@ class RepositorioConfiguracoesJdbcTest {
         var historico = "SELECT version, success FROM flyway_schema_history ORDER BY installed_rank";
         var antes = linhas(historico);
 
-        var reaberto = new RepositorioConfiguracoesJdbc(BancoDados.abrir(diretorio.resolve("damiq.db")));
+        var reaberto =
+                new RepositorioConfiguracoesJdbc(BancoDados.abrir(diretorio.resolve("damiq.db")), AutoriaDeTeste.SISTEMA);
 
         assertEquals("21", reaberto.vigente(JOAO_LEITE).orElseThrow().versao().valor());
         assertEquals(antes, linhas(historico));

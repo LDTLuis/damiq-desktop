@@ -1,5 +1,6 @@
 package br.com.damiq.desktop.infraestrutura;
 
+import br.com.damiq.desktop.infraestrutura.persistencia.AutoriaDeTeste;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import br.com.damiq.desktop.aplicacao.importacao.ImportarMedicoes;
@@ -40,13 +41,13 @@ class ImportarMedicoesIntegracaoTest {
     void importaCsvDoExcelEApontaALinhaRejeitada() throws IOException {
         var motor = MotorInstalado.exigir();
         var banco = BancoDados.abrir(diretorio.resolve("damiq.db"));
-        var barragens = new RepositorioBarragensJdbc(banco, Clock.systemUTC());
+        var barragens = new RepositorioBarragensJdbc(banco, AutoriaDeTeste.SISTEMA);
         barragens.salvar(new Barragem(JOAO_LEITE, "João Leite"));
-        var configuracoes = new RepositorioConfiguracoesJdbc(banco);
+        var configuracoes = new RepositorioConfiguracoesJdbc(banco, AutoriaDeTeste.SISTEMA);
         configuracoes.ativar(JOAO_LEITE, new Configuracao(new VersaoConfiguracao("21"), LoteExemplo.CONFIGURACAO),
                 OrigemConfiguracao.ARQUIVO, Instant.now());
         var processar = new ProcessarMedicoes(barragens, configuracoes, new RepositorioMedicoesJdbc(banco),
-                new RepositorioProcessamentosJdbc(banco), motor, evento -> {},
+                new RepositorioProcessamentosJdbc(banco, AutoriaDeTeste.SISTEMA), motor, evento -> {},
                 Clock.fixed(Instant.parse("2026-09-30T02:00:00Z"), ZoneOffset.UTC), 48);
         var importar = new ImportarMedicoes(new LeitorArquivoLeiturasPadrao(), processar);
 

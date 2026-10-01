@@ -1,5 +1,6 @@
 package br.com.damiq.desktop.infraestrutura.configuracao;
 
+import br.com.damiq.desktop.infraestrutura.persistencia.AutoriaDeTeste;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import br.com.damiq.desktop.aplicacao.configuracao.AtualizarConfiguracao;
@@ -34,9 +35,9 @@ class AtualizarConfiguracaoIntegracaoTest {
     void montar() {
         var motor = MotorInstalado.exigir();
         var banco = BancoDados.abrir(diretorio.resolve("damiq.db"));
-        var barragens = new RepositorioBarragensJdbc(banco, Clock.systemUTC());
+        var barragens = new RepositorioBarragensJdbc(banco, AutoriaDeTeste.SISTEMA);
         barragens.salvar(new Barragem(JOAO_LEITE, "João Leite"));
-        configuracoes = new RepositorioConfiguracoesJdbc(banco);
+        configuracoes = new RepositorioConfiguracoesJdbc(banco, AutoriaDeTeste.SISTEMA);
         atualizar = new AtualizarConfiguracao(
                 barragens, configuracoes, new FonteConfiguracaoArquivo(diretorio), motor, Clock.systemUTC());
     }
