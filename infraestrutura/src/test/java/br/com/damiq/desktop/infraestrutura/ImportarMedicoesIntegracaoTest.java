@@ -46,7 +46,7 @@ class ImportarMedicoesIntegracaoTest {
         configuracoes.ativar(JOAO_LEITE, new Configuracao(new VersaoConfiguracao("21"), LoteExemplo.CONFIGURACAO),
                 OrigemConfiguracao.ARQUIVO, Instant.now());
         var processar = new ProcessarMedicoes(barragens, configuracoes, new RepositorioMedicoesJdbc(banco),
-                new RepositorioProcessamentosJdbc(banco), motor,
+                new RepositorioProcessamentosJdbc(banco), motor, evento -> {},
                 Clock.fixed(Instant.parse("2026-09-30T02:00:00Z"), ZoneOffset.UTC), 48);
         var importar = new ImportarMedicoes(new LeitorArquivoLeiturasPadrao(), processar);
 
