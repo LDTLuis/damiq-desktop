@@ -2,8 +2,13 @@ package br.com.damiq.desktop.infraestrutura.motor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import br.com.damiq.desktop.aplicacao.motor.LoteMedicoes;
+import br.com.damiq.desktop.aplicacao.motor.RequisicaoRecusadaException;
+import br.com.damiq.desktop.dominio.alerta.Alerta;
+import br.com.damiq.desktop.dominio.alerta.Severidade;
 import br.com.damiq.desktop.dominio.configuracao.Configuracao;
 import br.com.damiq.desktop.dominio.configuracao.VersaoConfiguracao;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,5 +65,33 @@ class MotorCalculoIntegracaoTest {
 
         assertTrue(validacao.valida(), validacao.erros().toString());
         assertFalse(validacao.avisos().isEmpty());
+    }
+
+    @Test
+    void processarLote() {
+        var resultado = motor.processarLote(LoteExemplo.lote());
+
+        assertEquals("21", resultado.versaoConfiguracao().valor());
+        assertEquals(Severidade.CRITICO, resultado.statusBarragem());
+        assertEquals(4, resultado.medicoes().size());
+        assertEquals(3, resultado.rejeicoes().getFirst().indice());
+        assertEquals(1, resultado.lacunas().size());
+        assertEquals(2, resultado.alertas().size());
+        assertTrue(resultado.alertas().stream().anyMatch(Alerta::leituraSuspeita));
+    }
+
+    @Test
+    void configuracaoInvalidaRecusaOLoteInteiro() {
+        var lote = LoteExemplo.lote();
+        var invalida = new LoteMedicoes(
+                lote.barragem(),
+                configuracao("{\"versao\": 21, \"fuso_padrao\": \"America/Sao_Paulo\"}"),
+                lote.leituras(),
+                lote.historico(),
+                lote.agora());
+
+        var falha = assertThrows(RequisicaoRecusadaException.class, () -> motor.processarLote(invalida));
+
+        assertEquals("configuracao.fuso_padrao", falha.erros().getFirst().campo());
     }
 }
