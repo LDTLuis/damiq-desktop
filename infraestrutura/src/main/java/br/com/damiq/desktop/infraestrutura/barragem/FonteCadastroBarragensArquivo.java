@@ -7,8 +7,11 @@ import br.com.damiq.desktop.dominio.Validacao;
 import br.com.damiq.desktop.dominio.barragem.BarragemId;
 import br.com.damiq.desktop.dominio.barragem.CadastroBarragem;
 import br.com.damiq.desktop.dominio.barragem.CampoBarragem;
+import br.com.damiq.desktop.dominio.barragem.ContatoBarragem;
 import br.com.damiq.desktop.dominio.barragem.Coordenadas;
 import br.com.damiq.desktop.dominio.barragem.GrupoCampos;
+import br.com.damiq.desktop.dominio.barragem.MeioContato;
+import br.com.damiq.desktop.dominio.barragem.PapelContato;
 import br.com.damiq.desktop.dominio.barragem.TipoCampo;
 import br.com.damiq.desktop.dominio.barragem.UnidadeFederativa;
 import br.com.damiq.desktop.dominio.barragem.VersaoCadastro;
@@ -85,7 +88,8 @@ public final class FonteCadastroBarragensArquivo implements FonteCadastroBarrage
                     numero(item, "altura_macico_m"),
                     numero(item, "capacidade_total_m3"),
                     grupos(item.path("grupos")),
-                    campos(item.path("campos")));
+                    campos(item.path("campos")),
+                    contatos(item.path("contatos")));
             return CadastroPublicado.valido(cadastro);
         } catch (RuntimeException e) {
             return CadastroPublicado.recusado(id.valor(), id, e.getMessage());
@@ -176,5 +180,64 @@ public final class FonteCadastroBarragensArquivo implements FonteCadastroBarrage
         var grupos = new ArrayList<GrupoCampos>();
         lista.forEach(grupo -> grupos.add(new GrupoCampos(texto(grupo, "chave"), texto(grupo, "nome"))));
         return grupos;
+    }
+
+    private static List<ContatoBarragem> contatos(JsonNode lista) {
+        if (lista.isMissingNode() || lista.isNull()) {
+            return List.of();
+        }
+        if (!lista.isArray()) {
+            throw new IllegalArgumentException("contatos deve ser uma lista");
+        }
+        var contatos = new ArrayList<ContatoBarragem>();
+        for (var contato : lista) {
+            var chave = texto(contato, "chave");
+            var nivel = contato.path("nivel_acionamento");
+            if (!nivel.isMissingNode() && !nivel.isNull() && !nivel.isIntegralNumber()) {
+                throw new IllegalArgumentException("contato " + chave + ": nivel_acionamento deve ser 1, 2 ou 3");
+            }
+            contatos.add(new ContatoBarragem(
+                    chave,
+                    constante(PapelContato.class, texto(contato, "papel"), "contato " + chave + ": papel"),
+                    texto(contato, "entidade"),
+                    texto(contato, "responsavel"),
+                    texto(contato, "cargo"),
+                    meios(contato.path("meios"), chave),
+                    nivel.isIntegralNumber() ? nivel.asInt() : null,
+                    texto(contato, "substitui"),
+                    contato.path("recebe_copia_pae").asBoolean(false)));
+        }
+        return contatos;
+    }
+
+    private static List<MeioContato> meios(JsonNode lista, String chave) {
+        if (lista.isMissingNode() || lista.isNull()) {
+            return List.of();
+        }
+        if (!lista.isArray()) {
+            throw new IllegalArgumentException("contato " + chave + ": meios deve ser uma lista");
+        }
+        var meios = new ArrayList<MeioContato>();
+        for (var meio : lista) {
+            try {
+                meios.add(new MeioContato(constante(MeioContato.Tipo.class, texto(meio, "tipo"), "tipo"),
+                        texto(meio, "valor")));
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("contato " + chave + ": " + e.getMessage(), e);
+            }
+        }
+        return meios;
+    }
+
+    /** Constante do enum pelo nome, sem diferenciar maiúsculas; {@code null} se ausente. */
+    private static <E extends Enum<E>> E constante(Class<E> tipo, String nome, String campo) {
+        if (nome == null) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(tipo, nome.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(campo + " '" + nome + "' inválido", e);
+        }
     }
 }

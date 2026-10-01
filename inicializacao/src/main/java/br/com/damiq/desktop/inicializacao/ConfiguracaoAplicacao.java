@@ -21,6 +21,7 @@ import br.com.damiq.desktop.aplicacao.medicao.ProcessarMedicoes;
 import br.com.damiq.desktop.aplicacao.medicao.RepositorioMedicoes;
 import br.com.damiq.desktop.aplicacao.medicao.RepositorioProcessamentos;
 import br.com.damiq.desktop.aplicacao.motor.MotorCalculo;
+import br.com.damiq.desktop.aplicacao.notificacao.ConsultarAcionamento;
 import br.com.damiq.desktop.aplicacao.notificacao.ConsultarNotificacoes;
 import br.com.damiq.desktop.aplicacao.notificacao.NotificarAlertas;
 import br.com.damiq.desktop.aplicacao.notificacao.ReconhecerNotificacao;
@@ -226,6 +227,11 @@ public class ConfiguracaoAplicacao {
     @Bean
     ConsultarNotificacoes consultarNotificacoes(RepositorioNotificacoes repositorioNotificacoes) {
         return new ConsultarNotificacoes(repositorioNotificacoes);
+    }
+
+    @Bean
+    ConsultarAcionamento consultarAcionamento(RepositorioBarragens repositorioBarragens) {
+        return new ConsultarAcionamento(repositorioBarragens);
     }
 
     @Bean

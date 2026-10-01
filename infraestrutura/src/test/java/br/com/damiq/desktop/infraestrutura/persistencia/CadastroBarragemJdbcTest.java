@@ -8,8 +8,11 @@ import br.com.damiq.desktop.dominio.barragem.Barragem;
 import br.com.damiq.desktop.dominio.barragem.BarragemId;
 import br.com.damiq.desktop.dominio.barragem.CadastroBarragem;
 import br.com.damiq.desktop.dominio.barragem.CampoBarragem;
+import br.com.damiq.desktop.dominio.barragem.ContatoBarragem;
 import br.com.damiq.desktop.dominio.barragem.Coordenadas;
 import br.com.damiq.desktop.dominio.barragem.GrupoCampos;
+import br.com.damiq.desktop.dominio.barragem.MeioContato;
+import br.com.damiq.desktop.dominio.barragem.PapelContato;
 import br.com.damiq.desktop.dominio.barragem.TipoCampo;
 import br.com.damiq.desktop.dominio.barragem.UnidadeFederativa;
 import br.com.damiq.desktop.dominio.barragem.VersaoCadastro;
@@ -49,10 +52,32 @@ class CadastroBarragemJdbcTest {
 
     private static CadastroBarragem cadastro(
             String versao, String nome, boolean teste, List<GrupoCampos> grupos, List<CampoBarragem> campos) {
+        return cadastro(versao, nome, teste, grupos, campos, List.of());
+    }
+
+    private static CadastroBarragem cadastro(String versao, String nome, boolean teste, List<GrupoCampos> grupos,
+            List<CampoBarragem> campos, List<ContatoBarragem> contatos) {
         return new CadastroBarragem(JOAO_LEITE, new VersaoCadastro(versao), nome, teste, "SANEAGO",
                 "Abastecimento público", List.of("Goiânia", "Nerópolis"), UnidadeFederativa.GO,
-                new Coordenadas(-16.5701, -49.2151), "Ribeirão João Leite", "CCR", 50, 129_000_000, grupos, campos);
+                new Coordenadas(-16.5701, -49.2151), "Ribeirão João Leite", "CCR", 50, 129_000_000, grupos, campos,
+                contatos);
     }
+
+    private static CadastroBarragem comContatos(String versao, boolean teste, ContatoBarragem... contatos) {
+        return cadastro(versao, "João Leite", teste, List.of(), List.of(), List.of(contatos));
+    }
+
+    private static final ContatoBarragem COORDENADOR = new ContatoBarragem("coordenador_pae",
+            PapelContato.COORDENADOR_PAE, "Empresa de Saneamento", "Maria Exemplo", "Coordenadora do PAE",
+            List.of(new MeioContato(MeioContato.Tipo.CELULAR, "(62) 99999-0001"),
+                    new MeioContato(MeioContato.Tipo.EMAIL, "coordenacao.pae@exemplo.com.br")),
+            1, null, true);
+    private static final ContatoBarragem SUBSTITUTO = new ContatoBarragem("coordenador_substituto",
+            PapelContato.COORDENADOR_PAE, "Empresa de Saneamento", "João Exemplo", null,
+            List.of(new MeioContato(MeioContato.Tipo.TELEFONE, "(62) 3000-0002")), null, "coordenador_pae", false);
+    private static final ContatoBarragem DEFESA_CIVIL = new ContatoBarragem("defesa_civil_municipal",
+            PapelContato.DEFESA_CIVIL, "Defesa Civil Municipal", null, null,
+            List.of(new MeioContato(MeioContato.Tipo.TELEFONE, "199")), 3, null, true);
 
     private List<String> linhas(String sql) throws SQLException {
         try (var conexao = banco.getConnection();
@@ -145,5 +170,40 @@ class CadastroBarragemJdbcTest {
         assertEquals(2, apagados.get("barragem_grupo"));
         assertEquals(1, apagados.get("barragem"));
         assertFalse(barragens.versaoCadastro(JOAO_LEITE).isPresent());
+    }
+
+    @Test
+    void gravaELeOsContatosNaOrdem() {
+        var cadastro = comContatos("3", false, COORDENADOR, SUBSTITUTO, DEFESA_CIVIL);
+
+        barragens.salvarCadastro(cadastro);
+
+        assertEquals(cadastro.contatos(), barragens.buscarCadastro(JOAO_LEITE).orElseThrow().contatos());
+    }
+
+    @Test
+    void novaVersaoAtualizaContatosEExcluiLogicamenteOsQueSairam() throws SQLException {
+        barragens.salvarCadastro(comContatos("3", false, COORDENADOR, SUBSTITUTO, DEFESA_CIVIL));
+        // o substituto sai; a Defesa Civil ganha um responsável e passa para o início da lista
+        var defesaCivil = new ContatoBarragem("defesa_civil_municipal", PapelContato.DEFESA_CIVIL,
+                "Defesa Civil Municipal", "Coordenador de plantão", null,
+                List.of(new MeioContato(MeioContato.Tipo.TELEFONE, "199")), 3, null, true);
+
+        barragens.salvarCadastro(comContatos("4", false, defesaCivil, COORDENADOR));
+
+        assertEquals(List.of(defesaCivil, COORDENADOR), barragens.buscarCadastro(JOAO_LEITE).orElseThrow().contatos());
+        assertEquals(
+                List.of("coordenador_pae|1|ativo", "coordenador_substituto|1|excluido", "defesa_civil_municipal|0|ativo"),
+                linhas("""
+                        SELECT chave, ordem, CASE WHEN excluido_em IS NULL THEN 'ativo' ELSE 'excluido' END
+                        FROM barragem_contato ORDER BY chave"""));
+    }
+
+    @Test
+    void contatosDeBarragemDeTesteSaoApagadosComEla() throws SQLException {
+        barragens.salvarCadastro(comContatos("1", true, COORDENADOR, DEFESA_CIVIL));
+
+        assertEquals(List.of("1", "1"), linhas("SELECT teste FROM barragem_contato"));
+        assertEquals(2, new RepositorioDadosTesteJdbc(banco).apagarDadosDeTeste().get("barragem_contato"));
     }
 }

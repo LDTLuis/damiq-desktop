@@ -1,6 +1,6 @@
 # DAMIQ Desktop — estado do projeto e guia para continuar
 
-Registro de 01/10/2026, depois do PR #10. Ponto de partida para continuar o desenvolvimento do back do
+Registro de 01/10/2026, atualizado depois do PR #12 (contatos do PAE). Ponto de partida para continuar o desenvolvimento do back do
 Desktop em outra conversa: o que existe, as decisões tomadas, como trabalhar e o que falta.
 
 > **Para iniciar uma nova conversa:** peça para ler este arquivo e o
@@ -72,6 +72,7 @@ Pacote base `br.com.damiq.desktop`. Versões em `gradle/libs.versions.toml`; con
 | Notificações | `NotificarAlertas` (uma aberta por barragem+instrumento+tipo; escala se mais grave; idempotente, recupera pendentes ao iniciar), `ReconhecerNotificacao`, `ConsultarNotificacoes`; eventos pelo Spring Events | #8 |
 | Banco | Colunas de controle, `usuario` 1 = sistema, exclusão lógica, `LimparDadosTeste`, `ExcluirBarragem` | #9 |
 | Barragens | `SincronizarBarragens` (cópia do cadastro da Central), `ConsultarBarragens`; catálogo padrão + grupos por barragem | #10 |
+| Contatos do PAE | `contatos` no cadastro da Central (papel, meios na ordem de preferência, nível de acionamento, substituto); `ConsultarAcionamento`: quem acionar, em que ordem, para uma notificação ou nível, com pendências do cadastro | #12 |
 
 Eventos (Spring Events, síncronos): `MedicoesProcessadas` → `OuvinteNotificacoes` → `NotificarAlertas` →
 `NotificacaoEmitida` (`NOVA`/`ESCALADA`/`REPETIDA`); `NotificacaoReconhecida`. A interface vai ouvir os de
@@ -89,6 +90,7 @@ Inicialização (`DamiqDesktop`): sobe o contexto (Flyway migra o banco) → `Si
 | V3 | `notificacao`, `alerta.notificacao_id` |
 | V4 | `usuario`; recria todas as tabelas com as **colunas de controle**; unicidades viram índices parciais; gatilhos contra exclusão física |
 | V5 | Cadastro na `barragem` (campos obrigatórios, `versao_cadastro`), `barragem_grupo`, `barragem_campo` |
+| V6 | `barragem_contato` (contatos do PAE; meios em JSON) |
 
 Convenções: datas em texto ISO-8601 **UTC** com milissegundos (`2026-09-29T14:00:00.000Z`) + coluna `fuso`
 quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores fixos em TEXT com CHECK.
@@ -118,6 +120,11 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 9. **Configurações recusadas** vão só para o log (não para o banco).
 10. **Importação**: formato longo (uma leitura por linha) com colunas instrumento, tipo, data_hora (ou data +
     hora), valor, unidade; o leitor não valida valores, o motor recusa a linha.
+11. **Contatos do PAE vêm do cadastro da Central**, com o nível de resposta a partir do qual cada um é
+    acionado. O acionamento é **cumulativo** (fluxograma do PAE, §6.1 e §7.2): verde = equipe técnica →
+    coordenador do PAE → empreendedor; amarelo + entidade fiscalizadora; vermelho + Defesa Civil (que alerta a
+    população). A ordem da lista é a ordem de acionamento dentro do nível. Falta de papel previsto vira
+    **pendência** exibida, não recusa do cadastro. O nível vem da notificação (`nivelResposta`, do motor).
 
 ## 5. Como trabalhamos
 
@@ -141,11 +148,11 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 | Requisito | Situação |
 |---|---|
 | RF-01 Autenticação e perfis | **Não iniciado.** Base pronta: tabela `usuario`, porta `UsuarioCorrente` (hoje sempre "sistema"). Perfis por barragem |
-| RF-02 Barragens | **Cópia do cadastro da Central** pronta (#10). Faltam contatos/PAE, estruturas, ZAS, instrumentos detalhados |
+| RF-02 Barragens | **Cópia do cadastro da Central** pronta (#10), com contatos do PAE (#12). Faltam estruturas, ZAS, instrumentos detalhados |
 | RF-03 Medições | Processamento (#6) e importação CSV/XLSX (#7) prontos. Falta digitação (tela) e exclusão de medição |
 | RF-04 Cálculos | `processar_lote` integrado. Faltam `listar_calculos`/`calcular` (telas de cálculo) |
 | RF-05 Monitoramento/histórico | Dados gravados; faltam consultas por período/instrumento para o dashboard |
-| RF-06 Alertas e notificações | Notificação no app pronta (#8). Falta acionamento por contato/nível do PAE |
+| RF-06 Alertas e notificações | Notificação no app (#8) e quem acionar por nível do PAE (#12) prontos. Falta o registro da emergência e dos acionamentos (com RF-08) e o envio automático (e-mail/SMS), se exigido |
 | RF-07 Relatórios PDF | Não iniciado (OpenPDF; motor gera gráficos com `opcoes.graficos`) |
 | RF-08 Incidentes | Não iniciado |
 | RF-09 Dashboard | Não iniciado (UI) |
@@ -177,11 +184,11 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 
 ## 8. Próximos passos sugeridos
 
-1. **Contatos e ordem de acionamento do PAE** (RF-02 + RF-06): lista de contatos por barragem no contrato da
-   Central (PAE §2, §6, §7, §12 — o fluxograma de notificação do PAE é imagem, consultar visualmente), e
-   notificações indicando quem acionar em cada nível.
-2. **Consultas para o dashboard** (RF-05): séries por instrumento e período, situação atual por barragem.
-3. **`listar_calculos` / `calcular`** (RF-04) com registro dos cálculos por barragem.
+1. **Consultas para o dashboard** (RF-05): séries por instrumento e período, situação atual por barragem.
+2. **`listar_calculos` / `calcular`** (RF-04) com registro dos cálculos por barragem.
+3. **Registro da emergência** (RF-06 + RF-08): declaração de início e encerramento (obrigatória nos níveis
+   amarelo e vermelho), mensagem de notificação (PAE §11, p. 115) e registro de quem foi acionado, quando e se
+   confirmou o recebimento. Usa `ConsultarAcionamento`.
 4. **Tabela de auditoria** (RF-12).
 5. **Autenticação e perfis por barragem** (RF-01), substituindo o usuário "sistema".
 6. **Relatórios PDF** (RF-07) e **exportação** (RF-10).

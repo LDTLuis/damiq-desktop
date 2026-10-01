@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import br.com.damiq.desktop.aplicacao.barragem.FalhaFonteCadastroException;
 import br.com.damiq.desktop.dominio.barragem.BarragemId;
 import br.com.damiq.desktop.dominio.barragem.GrupoCampos;
+import br.com.damiq.desktop.dominio.barragem.MeioContato;
+import br.com.damiq.desktop.dominio.barragem.PapelContato;
 import br.com.damiq.desktop.dominio.barragem.TipoCampo;
 import br.com.damiq.desktop.dominio.barragem.UnidadeFederativa;
 import java.io.IOException;
@@ -64,6 +66,34 @@ class FonteCadastroBarragensArquivoTest {
         assertEquals("abastecimento", proprio.grupo());
         assertEquals("0.9", proprio.valor());
         assertFalse(proprio.padrao());
+        assertEquals(8, cadastro.contatos().size());
+        var coordenador = cadastro.contatos().get(1);
+        assertEquals(PapelContato.COORDENADOR_PAE, coordenador.papel());
+        assertEquals(1, coordenador.nivelAcionamento());
+        assertEquals(new MeioContato(MeioContato.Tipo.CELULAR, "(62) 99999-0002"), coordenador.meios().getFirst());
+        assertTrue(coordenador.recebeCopiaPae());
+        assertEquals("coordenador_pae", cadastro.contatos().get(2).substitui());
+        var prefeitura = cadastro.contatos().getLast();
+        assertNull(prefeitura.nivelAcionamento());
+        assertTrue(prefeitura.recebeCopiaPae());
+    }
+
+    @Test
+    void contatoInvalidoRecusaOCadastro() throws IOException {
+        var contato = "{\"chave\": \"coordenador_pae\", \"papel\": \"%s\", \"entidade\": \"Empresa\", "
+                + "\"meios\": [{\"tipo\": \"%s\", \"valor\": \"%s\"}], \"nivel_acionamento\": %s}";
+        var publicados = fonte("{\"barragens\": [%s, %s, %s, %s]}".formatted(
+                barragem("a", ", \"contatos\": [" + contato.formatted("coordenador_pae", "celular", "(62) 99999-0000", "1") + "]"),
+                barragem("b", ", \"contatos\": [" + contato.formatted("PREFEITO", "CELULAR", "(62) 99999-0000", "1") + "]"),
+                barragem("c", ", \"contatos\": [" + contato.formatted("COORDENADOR_PAE", "EMAIL", "sem-arroba", "1") + "]"),
+                barragem("d", ", \"contatos\": [" + contato.formatted("COORDENADOR_PAE", "CELULAR", "(62) 99999-0000", "\"amarelo\"") + "]")))
+                .buscar();
+
+        var valido = publicados.get(0).valido().orElseThrow(() -> new AssertionError(publicados.get(0).erro()));
+        assertEquals(PapelContato.COORDENADOR_PAE, valido.contatos().getFirst().papel());
+        assertTrue(publicados.get(1).erro().contains("PREFEITO"), publicados.get(1).erro());
+        assertTrue(publicados.get(2).erro().contains("e-mail inválido"), publicados.get(2).erro());
+        assertTrue(publicados.get(3).erro().contains("nivel_acionamento"), publicados.get(3).erro());
     }
 
     @Test

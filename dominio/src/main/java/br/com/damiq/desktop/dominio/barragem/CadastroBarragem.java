@@ -1,6 +1,7 @@
 package br.com.damiq.desktop.dominio.barragem;
 
 import br.com.damiq.desktop.dominio.Validacao;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
@@ -18,6 +19,8 @@ import java.util.List;
  * @param grupos grupos de campos da barragem, na ordem de exibição; chaves únicas
  * @param campos campos próprios da barragem, na ordem de exibição; chaves únicas, cada um num grupo desta
  *     barragem (ou sem grupo)
+ * @param contatos contatos do PAE, na ordem de acionamento dentro de cada nível; chaves únicas. Um substituto
+ *     aponta para um titular desta barragem, que não é ele mesmo substituto, e herda o nível dele
  */
 public record CadastroBarragem(
         BarragemId id,
@@ -34,7 +37,8 @@ public record CadastroBarragem(
         double alturaMacicoM,
         double capacidadeTotalM3,
         List<GrupoCampos> grupos,
-        List<CampoBarragem> campos) {
+        List<CampoBarragem> campos,
+        List<ContatoBarragem> contatos) {
 
     public CadastroBarragem {
         Validacao.obrigatorio(id, "identificador da barragem");
@@ -76,7 +80,41 @@ public record CadastroBarragem(
                         "campo " + campo.chave() + ": grupo '" + campo.grupo() + "' não existe nesta barragem");
             }
         }
+        contatos = List.copyOf(Validacao.obrigatorio(contatos, "contatos"));
+        validarContatos(contatos);
     }
+
+    private static void validarContatos(List<ContatoBarragem> contatos) {
+        var porChave = new HashMap<String, ContatoBarragem>();
+        for (var contato : contatos) {
+            if (porChave.put(contato.chave(), contato) != null) {
+                throw new IllegalArgumentException("contato repetido: " + contato.chave());
+            }
+        }
+        for (var contato : contatos) {
+            if (contato.substitui() == null) {
+                continue;
+            }
+            var titular = porChave.get(contato.substitui());
+            if (titular == null) {
+                throw new IllegalArgumentException("contato " + contato.chave() + ": substitui '"
+                        + contato.substitui() + "', que não existe nesta barragem");
+            }
+            if (titular.substitui() != null) {
+                throw new IllegalArgumentException("contato " + contato.chave() + ": substitui '" + titular.chave()
+                        + "', que já é substituto de outro contato");
+            }
+            if (contato.nivelAcionamento() != null && !contato.nivelAcionamento().equals(titular.nivelAcionamento())) {
+                throw new IllegalArgumentException("contato " + contato.chave()
+                        + ": o substituto herda o nível de acionamento do titular; não informe outro");
+            }
+            if (titular.nivelAcionamento() != null && contato.meios().isEmpty()) {
+                throw new IllegalArgumentException(
+                        "contato " + contato.chave() + ": informe ao menos um meio de contato");
+            }
+        }
+    }
+
 
     /** Identificação da barragem. */
     public Barragem barragem() {

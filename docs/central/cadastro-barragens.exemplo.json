@@ -39,6 +39,24 @@
         { "chave": "outorga", "rotulo": "Outorga de uso da água", "grupo": "regularizacao", "tipo": "TEXTO", "valor": "Portaria nº 946/2009 - GAB", "padrao": true },
         { "chave": "vazao_abastecimento", "rotulo": "Vazão destinada ao abastecimento", "grupo": "abastecimento", "tipo": "NUMERO", "valor": 5.33, "unidade": "m³/s", "padrao": false },
         { "chave": "descarga_ecologica", "rotulo": "Descarga ecológica mínima", "grupo": "abastecimento", "tipo": "NUMERO", "valor": 0.90, "unidade": "m³/s", "padrao": false }
+      ],
+      "contatos": [
+        { "chave": "equipe_operacao", "papel": "EQUIPE_TECNICA", "entidade": "Saneamento de Goiás S.A. - SANEAGO", "responsavel": "Plantão da operação",
+          "meios": [ { "tipo": "RADIO", "valor": "Canal da operação" }, { "tipo": "TELEFONE", "valor": "(62) 3000-0001" } ], "nivel_acionamento": 1 },
+        { "chave": "coordenador_pae", "papel": "COORDENADOR_PAE", "entidade": "Saneamento de Goiás S.A. - SANEAGO", "responsavel": "Coordenador(a) do PAE (exemplo)", "cargo": "Coordenador do PAE",
+          "meios": [ { "tipo": "CELULAR", "valor": "(62) 99999-0002" }, { "tipo": "EMAIL", "valor": "coordenacao.pae@exemplo.com.br" } ], "nivel_acionamento": 1, "recebe_copia_pae": true },
+        { "chave": "coordenador_pae_substituto", "papel": "COORDENADOR_PAE", "entidade": "Saneamento de Goiás S.A. - SANEAGO", "responsavel": "Substituto(a) do coordenador (exemplo)", "cargo": "Coordenador substituto do PAE",
+          "meios": [ { "tipo": "CELULAR", "valor": "(62) 99999-0003" } ], "substitui": "coordenador_pae" },
+        { "chave": "empreendedor", "papel": "EMPREENDEDOR", "entidade": "Saneamento de Goiás S.A. - SANEAGO", "responsavel": "Presidência (exemplo)",
+          "meios": [ { "tipo": "TELEFONE", "valor": "(62) 3000-0004" }, { "tipo": "EMAIL", "valor": "presidencia@exemplo.com.br" } ], "nivel_acionamento": 1, "recebe_copia_pae": true },
+        { "chave": "semad", "papel": "ENTIDADE_FISCALIZADORA", "entidade": "Secretaria de Estado de Meio Ambiente e Desenvolvimento Sustentável - SEMAD", "responsavel": "Secretário(a) de Estado (exemplo)",
+          "meios": [ { "tipo": "TELEFONE", "valor": "(62) 3000-0005" }, { "tipo": "EMAIL", "valor": "gabinete@exemplo.gov.br" } ], "nivel_acionamento": 2, "recebe_copia_pae": true },
+        { "chave": "defesa_civil_goiania", "papel": "DEFESA_CIVIL", "entidade": "Defesa Civil de Goiânia", "responsavel": "Coordenador(a) da Defesa Civil (exemplo)",
+          "meios": [ { "tipo": "CELULAR", "valor": "(62) 99999-0006" }, { "tipo": "TELEFONE", "valor": "199" } ], "nivel_acionamento": 3, "recebe_copia_pae": true },
+        { "chave": "defesa_civil_estado", "papel": "DEFESA_CIVIL", "entidade": "Comando de Operações de Defesa Civil de Goiás - CODEC", "responsavel": "Comandante (exemplo)",
+          "meios": [ { "tipo": "CELULAR", "valor": "(62) 99999-0007" }, { "tipo": "TELEFONE", "valor": "193" } ], "nivel_acionamento": 3, "recebe_copia_pae": true },
+        { "chave": "prefeitura_goiania", "papel": "OUTRO", "entidade": "Prefeitura Municipal de Goiânia",
+          "meios": [ { "tipo": "EMAIL", "valor": "gabinete@exemplo.go.gov.br" } ], "recebe_copia_pae": true }
       ]
     }
   ]
