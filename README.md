@@ -48,6 +48,10 @@ O banco SQLite (`damiq.db`) e os arquivos de configuração ficam no diretório 
 O esquema é criado e atualizado pelo Flyway ao iniciar, a partir de
 [`db/migracao`](infraestrutura/src/main/resources/db/migracao).
 
+**Cadastro de barragens:** é feito na Central de Configurações; o Desktop guarda uma cópia somente leitura,
+sincronizada ao iniciar. Até a API da Central existir, a publicação é lida de `<dados>/cadastro/barragens.json`.
+Formato e regras: [`docs/central/cadastro-barragens.md`](docs/central/cadastro-barragens.md).
+
 **Regras do banco:**
 
 - A **barragem é o cadastro principal**: todo dado, de cálculo ou de usuário, pertence a uma barragem.

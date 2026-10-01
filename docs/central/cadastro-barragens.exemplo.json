@@ -1,0 +1,33 @@
+{
+  "barragens": [
+    {
+      "id": "joao-leite",
+      "versao": 3,
+      "nome": "Barragem do Ribeirão João Leite",
+      "teste": false,
+      "empreendedor": "Saneamento de Goiás S.A. - SANEAGO",
+      "finalidade": "Abastecimento público",
+      "municipios": ["Goiânia"],
+      "uf": "GO",
+      "latitude": -16.5701,
+      "longitude": -49.2151,
+      "curso_dagua": "Ribeirão João Leite",
+      "tipo_macico": "Concreto compactado com rolo (CCR), com fechamento em terra nas ombreiras",
+      "altura_macico_m": 50,
+      "capacidade_total_m3": 129000000,
+      "campos": [
+        { "chave": "comprimento_crista", "rotulo": "Comprimento da crista", "grupo": "Maciço", "tipo": "NUMERO", "valor": 451, "unidade": "m" },
+        { "chave": "cota_crista", "rotulo": "Cota da crista", "grupo": "Maciço", "tipo": "NUMERO", "valor": 752.5, "unidade": "m" },
+        { "chave": "cota_soleira_vertedouro", "rotulo": "Cota da soleira do vertedouro", "grupo": "Vertedouro", "tipo": "NUMERO", "valor": 749.0, "unidade": "m" },
+        { "chave": "largura_vertedouro", "rotulo": "Largura do vertedouro", "grupo": "Vertedouro", "tipo": "NUMERO", "valor": 50, "unidade": "m" },
+        { "chave": "vazao_cheia_projeto", "rotulo": "Vazão da cheia de projeto (PMP)", "grupo": "Vertedouro", "tipo": "NUMERO", "valor": 1236, "unidade": "m³/s" },
+        { "chave": "volume_util", "rotulo": "Volume útil", "grupo": "Reservatório", "tipo": "NUMERO", "valor": 117, "unidade": "hm³" },
+        { "chave": "volume_morto", "rotulo": "Volume morto", "grupo": "Reservatório", "tipo": "NUMERO", "valor": 12, "unidade": "hm³" },
+        { "chave": "area_drenagem", "rotulo": "Área de drenagem", "grupo": "Hidrologia", "tipo": "NUMERO", "valor": 763, "unidade": "km²" },
+        { "chave": "inicio_enchimento", "rotulo": "Início do enchimento", "grupo": "Histórico", "tipo": "DATA", "valor": "2009-12-18" },
+        { "chave": "possui_pae", "rotulo": "Possui PAE", "grupo": "Segurança", "tipo": "BOOLEANO", "valor": true },
+        { "chave": "outorga", "rotulo": "Outorga de uso da água", "grupo": "Regularização", "tipo": "TEXTO", "valor": "Portaria nº 946/2009 - GAB" }
+      ]
+    }
+  ]
+}

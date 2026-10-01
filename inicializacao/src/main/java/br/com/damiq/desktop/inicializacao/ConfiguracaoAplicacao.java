@@ -1,6 +1,10 @@
 package br.com.damiq.desktop.inicializacao;
 
+import br.com.damiq.desktop.aplicacao.barragem.ConsultarBarragens;
 import br.com.damiq.desktop.aplicacao.barragem.ExcluirBarragem;
+import br.com.damiq.desktop.aplicacao.barragem.FonteCadastroBarragens;
+import br.com.damiq.desktop.aplicacao.barragem.SincronizarBarragens;
+import br.com.damiq.desktop.infraestrutura.barragem.FonteCadastroBarragensArquivo;
 import br.com.damiq.desktop.aplicacao.barragem.RepositorioBarragens;
 import br.com.damiq.desktop.aplicacao.manutencao.LimparDadosTeste;
 import br.com.damiq.desktop.aplicacao.usuario.UsuarioCorrente;
@@ -53,6 +57,8 @@ import org.springframework.core.env.Environment;
  *   <li>{@code damiq.dados.diretorio}: dados do usuário (padrão: {@code %APPDATA%\DAMIQ} no Windows,
  *       {@code ~/.local/share/damiq} no Linux);
  *   <li>{@code damiq.banco.arquivo}: banco SQLite (padrão: {@code <dados>/damiq.db});
+ *   <li>{@code damiq.cadastro.arquivo}: cadastro das barragens publicado pela Central, até a API existir
+ *       (padrão: {@code <dados>/cadastro/barragens.json});
  *   <li>{@code damiq.configuracao.diretorio}: arquivos {@code <id da barragem>.json} com a configuração, até a
  *       Central existir (padrão: {@code <dados>/configuracoes});
  *   <li>{@code damiq.motor.historico-por-instrumento}: leituras anteriores enviadas ao motor por instrumento;
@@ -117,6 +123,24 @@ public class ConfiguracaoAplicacao {
     @Bean
     ExcluirBarragem excluirBarragem(RepositorioBarragens repositorioBarragens) {
         return new ExcluirBarragem(repositorioBarragens);
+    }
+
+    @Bean
+    FonteCadastroBarragens fonteCadastroBarragens(Environment ambiente) {
+        var arquivo = ambiente.getProperty("damiq.cadastro.arquivo");
+        return new FonteCadastroBarragensArquivo(
+                arquivo != null ? Path.of(arquivo) : diretorioDados(ambiente).resolve("cadastro").resolve("barragens.json"));
+    }
+
+    @Bean
+    SincronizarBarragens sincronizarBarragens(
+            FonteCadastroBarragens fonteCadastroBarragens, RepositorioBarragens repositorioBarragens) {
+        return new SincronizarBarragens(fonteCadastroBarragens, repositorioBarragens);
+    }
+
+    @Bean
+    ConsultarBarragens consultarBarragens(RepositorioBarragens repositorioBarragens) {
+        return new ConsultarBarragens(repositorioBarragens);
     }
 
     @Bean

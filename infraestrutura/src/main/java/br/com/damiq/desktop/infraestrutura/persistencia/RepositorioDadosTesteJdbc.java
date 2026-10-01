@@ -15,7 +15,8 @@ public final class RepositorioDadosTesteJdbc implements RepositorioDadosTeste {
      * registros reais ({@code criado_por}/{@code atualizado_por}) e entram quando houver autenticação (RF-01).
      */
     private static final List<String> TABELAS = List.of(
-            "alerta", "notificacao", "rejeicao", "lacuna", "medicao", "processamento", "configuracao", "barragem");
+            "alerta", "notificacao", "rejeicao", "lacuna", "medicao", "processamento", "configuracao",
+            "barragem_campo", "barragem");
 
     private final Jdbc jdbc;
 
