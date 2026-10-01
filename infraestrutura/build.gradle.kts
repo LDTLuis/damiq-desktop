@@ -12,6 +12,7 @@ dependencies {
     implementation(libs.sqlite.jdbc)
     implementation(libs.flyway.core)
     implementation(libs.poi.ooxml)
+    implementation(libs.spring.security.crypto)
     implementation(libs.slf4j.api)
 
     testImplementation(libs.mockito.core)
