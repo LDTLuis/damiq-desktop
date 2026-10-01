@@ -1,5 +1,7 @@
 package br.com.damiq.desktop.inicializacao;
 
+import br.com.damiq.desktop.aplicacao.motor.FalhaMotorException;
+import br.com.damiq.desktop.aplicacao.motor.VerificarCompatibilidadeMotor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -14,6 +16,11 @@ public final class DamiqDesktop {
     public static void main(String[] args) {
         try (var contexto = new AnnotationConfigApplicationContext(ConfiguracaoAplicacao.class)) {
             LOG.info("DAMIQ Desktop iniciado ({} beans)", contexto.getBeanDefinitionCount());
+            try {
+                contexto.getBean(VerificarCompatibilidadeMotor.class).executar();
+            } catch (FalhaMotorException e) {
+                LOG.error("Motor de cálculo indisponível: {}", e.getMessage());
+            }
         }
     }
 }
