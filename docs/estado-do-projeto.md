@@ -1,6 +1,6 @@
 # DAMIQ Desktop — estado do projeto e guia para continuar
 
-Registro de 01/10/2026, atualizado depois do PR #12 (contatos do PAE). Ponto de partida para continuar o desenvolvimento do back do
+Registro de 01/10/2026, atualizado depois do RF-01 (autenticação e perfis). Ponto de partida para continuar o desenvolvimento do back do
 Desktop em outra conversa: o que existe, as decisões tomadas, como trabalhar e o que falta.
 
 > **Para iniciar uma nova conversa:** peça para ler este arquivo e o
@@ -19,9 +19,11 @@ Desktop em outra conversa: o que existe, as decisões tomadas, como trabalhar e 
 | Requisitos, stack, PAE, apostila | `Projeto-DAMIQ/1. Documentos/` (requisitos RF-01 a RF-13, `Stack DAMIQ.xlsx`, `Documentos Professor/`) |
 | Guia da configuração da Central | `Projeto-DAMIQ/1. Documentos/Documentos Central de Configuração Web/guia-configuracao-v1.pdf` |
 | Contrato do cadastro de barragens | [`docs/central/cadastro-barragens.md`](central/cadastro-barragens.md) (neste repositório) |
+| Contrato do cadastro de usuários | [`docs/central/cadastro-usuarios.md`](central/cadastro-usuarios.md) (neste repositório) |
+| Documentação acadêmica (requisitos, casos de uso, modelo e dicionário de dados) | [Claude Docs](https://claude.ai/code/artifact/bfbfa91b-8d11-4cd8-877c-f2870c2b2446); atualizar quando uma entrega mudar requisitos, casos de uso ou o banco |
 
 **Stack:** Java 21, Gradle 9.8 (wrapper), Spring Context + Spring Events, SQLite JDBC + Flyway 13, Jackson 3,
-SLF4J + Logback, JUnit 5 + Mockito, Apache POI 5.5. Sem Spring Boot nem JPA (JDBC puro).
+SLF4J + Logback, JUnit 5 + Mockito, Apache POI 5.5, Spring Security Crypto 7.1 (só o bcrypt). Sem Spring Boot nem JPA (JDBC puro).
 
 ## 2. Como rodar
 
@@ -37,13 +39,15 @@ py -3.13 -m venv .motor
 - `DAMIQ_MOTOR_OBRIGATORIO=true` faz os testes de integração falharem (em vez de serem pulados) sem o motor —
   é assim no CI.
 - Dados do usuário: `%APPDATA%\DAMIQ` (Windows) ou `~/.local/share/damiq` (Linux); `-Ddamiq.dados.diretorio`
-  para outro lugar. Lá ficam `damiq.db`, `configuracoes/<barragem>.json` e `cadastro/barragens.json`.
+  para outro lugar. Lá ficam `damiq.db`, `configuracoes/<barragem>.json`, `cadastro/barragens.json` e
+  `cadastro/usuarios.json`.
 - Para testar o app sem mexer nos seus dados, use uma pasta temporária:
   `JAVA_OPTS="-Ddamiq.dados.diretorio=<tmp> -Ddamiq.motor.python=<raiz>/.motor/Scripts/python.exe" inicializacao/build/install/inicializacao/bin/inicializacao`
   (depois de `./gradlew :inicializacao:installDist`; no Git Bash, use caminhos com `/`).
 
 Propriedades (`-D`): `damiq.motor.python`, `damiq.motor.tempo-limite-s` (60), `damiq.motor.historico-por-instrumento`
-(48), `damiq.dados.diretorio`, `damiq.banco.arquivo`, `damiq.configuracao.diretorio`, `damiq.cadastro.arquivo`.
+(48), `damiq.dados.diretorio`, `damiq.banco.arquivo`, `damiq.configuracao.diretorio`, `damiq.cadastro.arquivo`,
+`damiq.usuarios.arquivo`, `damiq.acesso.limite-tentativas` (5).
 
 ## 3. Arquitetura
 
@@ -73,12 +77,13 @@ Pacote base `br.com.damiq.desktop`. Versões em `gradle/libs.versions.toml`; con
 | Banco | Colunas de controle, `usuario` 1 = sistema, exclusão lógica, `LimparDadosTeste`, `ExcluirBarragem` | #9 |
 | Barragens | `SincronizarBarragens` (cópia do cadastro da Central), `ConsultarBarragens`; catálogo padrão + grupos por barragem | #10 |
 | Contatos do PAE | `contatos` no cadastro da Central (papel, meios na ordem de preferência, nível de acionamento, substituto); `ConsultarAcionamento`: quem acionar, em que ordem, para uma notificação ou nível, com pendências do cadastro | #12 |
+| Usuários e acesso | `SincronizarUsuarios` (cópia dos usuários da Central), `Entrar` (senha conferida no aparelho com bcrypt; bloqueio após 5 tentativas), `Sessao` (usuário conectado: fornece a barragem e assina as alterações), `TrocarSenha` (obrigatória com `trocar_senha`), `DesbloquearUsuario`, `ControleAcesso` (perfil × `Permissao`, barragem do usuário) | RF-01 |
 
 Eventos (Spring Events, síncronos): `MedicoesProcessadas` → `OuvinteNotificacoes` → `NotificarAlertas` →
 `NotificacaoEmitida` (`NOVA`/`ESCALADA`/`REPETIDA`); `NotificacaoReconhecida`. A interface vai ouvir os de
 notificação.
 
-Inicialização (`DamiqDesktop`): sobe o contexto (Flyway migra o banco) → `SincronizarBarragens` →
+Inicialização (`DamiqDesktop`): sobe o contexto (Flyway migra o banco) → `SincronizarBarragens` → `SincronizarUsuarios` →
 `VerificarCompatibilidadeMotor` → `NotificarAlertas.executarPendentes`.
 
 ### Banco (migrações em `infraestrutura/src/main/resources/db/migracao`)
@@ -91,6 +96,7 @@ Inicialização (`DamiqDesktop`): sobe o contexto (Flyway migra o banco) → `Si
 | V4 | `usuario`; recria todas as tabelas com as **colunas de controle**; unicidades viram índices parciais; gatilhos contra exclusão física |
 | V5 | Cadastro na `barragem` (campos obrigatórios, `versao_cadastro`), `barragem_grupo`, `barragem_campo` |
 | V6 | `barragem_contato` (contatos do PAE; meios em JSON) |
+| V7 | `usuario`: barragem, login (único entre ativos), versão do cadastro, hash bcrypt, perfil, e-mail, telefone, cargo, CREA, bloqueio, tentativas, troca obrigatória, último acesso; regras entre colunas em gatilhos (a tabela não é recriada porque todas a referenciam) |
 
 Convenções: datas em texto ISO-8601 **UTC** com milissegundos (`2026-09-29T14:00:00.000Z`) + coluna `fuso`
 quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores fixos em TEXT com CHECK.
@@ -132,6 +138,13 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 13. **A barragem é o topo da cadeia, inclusive para o usuário**: cada usuário pertence a uma barragem e só vê e
     altera os dados dela. A barragem vem do usuário conectado, **nunca de uma escolha na tela** (não há tela de
     seleção de barragem). Os casos de uso continuam recebendo `BarragemId`; quem o fornece é a sessão (RF-01).
+14. **Usuários são cadastrados na Central** pelo administrador; cada aparelho recebe uma cópia e **confere a
+    senha localmente** (bcrypt), para funcionar sem rede. Cada usuário pertence a **uma única barragem**
+    (`barragem_id`; vazia só no "sistema"). Campos: login, senha_hash, perfil (`ADMINISTRADOR`, `ENGENHEIRO`,
+    `TECNICO_CAMPO`), nome, e-mail, telefone, cargo, registro profissional (CREA, obrigatório para engenheiro),
+    bloqueado, tentativas, trocar_senha, último acesso. **CPF não é coletado** (LGPD). Usuários e contatos do
+    PAE ficam em tabelas separadas. Senha trocada ou bloqueio por tentativas no aparelho valem até a Central
+    publicar uma nova versão do usuário.
 
 ## 5. Como trabalhamos
 
@@ -154,7 +167,7 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 
 | Requisito | Situação |
 |---|---|
-| RF-01 Autenticação e perfis | **Não iniciado.** Base pronta: tabela `usuario`, porta `UsuarioCorrente` (hoje sempre "sistema"). Cada usuário pertence a uma barragem (decisão 13) |
+| RF-01 Autenticação e perfis | **Back pronto**: cópia dos usuários da Central, entrada com bcrypt, bloqueio, troca de senha, sessão na barragem do usuário, permissões por perfil. Falta a tela e aplicar o `ControleAcesso` nos casos de uso já existentes |
 | RF-02 Barragens | **Cópia do cadastro da Central** pronta (#10), com contatos do PAE (#12). Faltam estruturas, ZAS, instrumentos detalhados |
 | RF-03 Medições | Processamento (#6) e importação CSV/XLSX (#7) prontos. Falta digitação (tela) e exclusão de medição |
 | RF-04 Cálculos | `processar_lote` integrado. Faltam `listar_calculos`/`calcular` (telas de cálculo) |
@@ -190,7 +203,11 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
 - Versão do motor não é gravada no processamento (vir do `info` da inicialização).
 - Número da linha do arquivo importado não é gravado em `rejeicao`.
 - Excluir medição pela tela: decidir o efeito sobre alertas/notificações já gerados.
-- Usuários de teste ficam fora de `LimparDadosTeste` até existir login.
+- `ControleAcesso` ainda não é chamado pelos casos de uso anteriores ao RF-01 (importar, reconhecer notificação,
+  consultas, `LimparDadosTeste`, `ExcluirBarragem`); `ReconhecerNotificacao` ainda recebe o responsável como
+  texto em vez de vir da sessão.
+- Senha trocada no aparelho não vai para a Central (depende da sincronização).
+- Chave do usuário é o `login`; se a Central permitir renomear, o contrato precisa de um id estável.
 - Histórico das versões do cadastro de barragens não é guardado (só a cópia atual).
 
 ## 8. Próximos passos sugeridos
@@ -201,7 +218,7 @@ quando o fuso original importa; booleanos INTEGER 0/1; tabelas `STRICT`; valores
    amarelo e vermelho), mensagem de notificação (PAE §11, p. 115) e registro de quem foi acionado, quando e se
    confirmou o recebimento. Usa `ConsultarAcionamento`.
 4. **Tabela de auditoria** (RF-12).
-5. **Autenticação e perfis** (RF-01), substituindo o usuário "sistema": usuário vinculado à sua barragem, que
-   passa a ser o contexto de todas as telas (decisão 13).
+5. **Controle de acesso nos casos de uso existentes** (RF-01): chamar o `ControleAcesso` em importar,
+   reconhecer (com o responsável vindo da sessão), consultas, `LimparDadosTeste` e `ExcluirBarragem`.
 6. **Sincronização com o servidor da Central** (decisão 12), quando a API existir.
 7. **Relatórios PDF** (RF-07) e **exportação** (RF-10).

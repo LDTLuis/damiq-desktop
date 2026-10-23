@@ -99,10 +99,12 @@ class ColunasDeControleTest {
         var banco = BancoDados.abrir(diretorio.resolve("damiq.db"));
         assertEquals(List.of("1|sistema|0"), linhas(banco, "SELECT id, nome, teste FROM usuario"));
 
-        executar(banco, """
-                INSERT INTO usuario (id, nome, criado_em, criado_por, atualizado_em, atualizado_por)
-                VALUES (2, 'Eng. Ana', '2026-10-01T00:00:00.000Z', 1, '2026-10-01T00:00:00.000Z', 1)""");
         new RepositorioBarragensJdbc(banco, AutoriaDeTeste.em(AGORA)).salvar(new Barragem(REAL, "João Leite"));
+        executar(banco, """
+                INSERT INTO usuario (id, nome, barragem_id, login, senha_hash, perfil, email, registro_profissional,
+                    criado_em, criado_por, atualizado_em, atualizado_por)
+                VALUES (2, 'Eng. Ana', 'joao-leite', 'ana', '$2a$10$x', 'ENGENHEIRO', 'ana@x.com', 'CREA-GO 1/D',
+                    '2026-10-01T00:00:00.000Z', 1, '2026-10-01T00:00:00.000Z', 1)""");
         var depois = AGORA.plusSeconds(60);
         new RepositorioBarragensJdbc(banco, AutoriaDeTeste.em(depois, new UsuarioId(2)))
                 .salvar(new Barragem(REAL, "Barragem do Ribeirão João Leite"));

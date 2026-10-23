@@ -1,0 +1,41 @@
+{
+  "usuarios": [
+    {
+      "login": "admin.joaoleite",
+      "versao": 1,
+      "barragem": "joao-leite",
+      "perfil": "ADMINISTRADOR",
+      "nome": "Administrador do Sistema",
+      "email": "admin.joaoleite@exemplo.com.br",
+      "cargo": "Administrador do DAMIQ",
+      "senha_hash": "$2a$10$CeP9at6vDRDfnuC/eJUHyu3LtHqZTMFO9y0ATCzPt99EcdvoTnSNi",
+      "trocar_senha": true
+    },
+    {
+      "login": "eng.joaoleite",
+      "versao": 4,
+      "barragem": "joao-leite",
+      "perfil": "ENGENHEIRO",
+      "nome": "Engenheira Responsável",
+      "email": "eng.joaoleite@exemplo.com.br",
+      "telefone": "(62) 99999-0001",
+      "cargo": "Engenheira de segurança de barragens",
+      "registro_profissional": "CREA-GO 000000/D",
+      "senha_hash": "$2a$10$xLS1W84muMQxPyNj2Sc/QOyVSo8o0GATq/lTMK42I5jWzJQ7Oy.YC",
+      "bloqueado": false,
+      "trocar_senha": false
+    },
+    {
+      "login": "tecnico.joaoleite",
+      "versao": "2",
+      "barragem": "joao-leite",
+      "perfil": "TECNICO_CAMPO",
+      "nome": "Técnico de Campo",
+      "email": "tecnico.joaoleite@exemplo.com.br",
+      "telefone": "(62) 99999-0002",
+      "cargo": "Técnico de instrumentação",
+      "senha_hash": "$2a$10$sLF0p.dZs8JIn4g.hc.PU.n7VoMG1PuHKlvQ33pzUsotsvcmYZWCa",
+      "trocar_senha": true
+    }
+  ]
+}
